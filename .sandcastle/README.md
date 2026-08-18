@@ -19,15 +19,23 @@ pnpm sandcastle:smoke         # health-check the sandbox itself
 ```
 poll GitHub every 2 minutes for open issues labelled `Sandcastle`
    ↓  oldest first
-git fetch origin, clear any leftover worktree
+post to Slack: "🏰 Planning #n"   ← every later message threads under this one
    ↓
-post to Slack: "🏰 Working on #n"   ← every later message threads under this one
+PHASE 1 · container: the agent runs the `kickoff` skill and returns a plan. No code.
+   ↓  the plan comes back through an <plan> tag, not a file
+host: one empty commit, git push, gh pr create --draft   ← your credentials, not the sandbox's
+   ↓  the plan IS the pull request description
+label swap → `Sandcastle:awaiting-approval`, state written to state/issue-n.json
    ↓
-container: .npmrc written, pnpm install, agent implements the issue
+PHASE 2 · you read the plan and comment on the pull request
+   ↓  no container is alive here; this can take days, and the watcher can restart
+comment `approve` ─────────────→ PHASE 3
+anything else ─→ agent revises the plan, rewrites the description, back to PHASE 2
+comment `abandon` ─────────────→ stop, PR left for you to delete
+   ↓
+PHASE 3 · container: RESUMES the planning session, implements, runs the gate, commits
    ↓  it commits; it cannot push (SSH remote, no key in the container)
-host: git push, gh pr create   ← your credentials, not the sandbox's
-   ↓
-remove the label, comment on the issue, reply in the Slack thread
+host: git push, gh pr ready, comment with the commits and how to test it locally
    ↓
 PAUSE until that pull request is merged or closed
    ↓
@@ -41,15 +49,18 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 
 | File | |
 |---|---|
-| `main.mts` | the watcher — poll, dispatch, push, open PR, notify, pause |
-| `implement-issue.md` | the agent's prompt: one issue, passed in by the host |
-| `smoke.mts` + `smoke-test.md` | nine checks proving the sandbox works at all |
-| `sandbox.mts` | store mount, `.npmrc` injection and startup commands, shared by both entry points |
+| `main.mts` | the watcher — poll, dispatch all three phases, push, open PR, notify, pause |
+| `plan-issue.md` | phase 1's prompt: read the issue, run `kickoff`, return a plan, change nothing |
+| `revise-plan.md` | phase 2's prompt when you ask for changes instead of approving |
+| `implement-plan.md` | phase 3's prompt: build the approved plan, and say how to test it by hand |
+| `smoke.mts` + `smoke-test.md` | eleven checks proving the sandbox works at all |
+| `sandbox.mts` | store mount, `.npmrc` injection, plugin install and startup commands, shared by both entry points |
 | `slack.mts` | `chat.postMessage` over a bot token |
 | `Dockerfile` | node 22 + pnpm + gh + jq + Claude Code |
 | `.env` | secrets, gitignored — see below |
 | `docs/adr/` | decisions about how the factory behaves, scoped to this directory rather than to the host repo |
 | `logs/`, `worktrees/` | per-run output, gitignored |
+| `state/` | one JSON file per issue waiting for plan approval, gitignored |
 
 ## Setup
 
@@ -68,6 +79,7 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
 | `NPM_AUTH_TOKEN` | GitHub Packages token (`read:packages`) for `@finstreet/*` — `pnpm install` in the container 401s without it |
+| `FINSTREET_MCP_TOKEN` | bearer token for the `finstreet-mcp` server the `finstreet-fe` plugin carries — without it the server is configured but never connects |
 
 Every key in this file is forwarded into the container. A key listed with an **empty value**
 falls back to the host shell's value, so `NPM_AUTH_TOKEN=` is enough when your `~/.zshrc`
@@ -75,6 +87,27 @@ already exports it — the secret then lives in one place. A key that is *absent
 is not forwarded at all, whatever the shell says.
 
 Slack is optional; without it the watcher logs `Slack notifications off` and runs normally.
+
+### What the Slack thread looks like
+
+One top-level post per issue; everything else replies under it, so the channel keeps one entry
+per issue however long the review takes. Each update ends with the links that matter *for that
+step* — the point is never having to hunt for the right tab:
+
+| Update | Links it carries |
+|---|---|
+| 🏰 Planning #n | the issue |
+| 🏰 Plan posted, waiting for you | the plan (PR description), where to reply, the log |
+| 🏰 Plan revised after *your* feedback | the new plan, your comment, the revision notice, the log |
+| 🏰 Plan approved — implementing now | your approval comment, the plan, the log |
+| ⏳ heartbeat, at most one every 2 min | — (one line of what the agent is doing) |
+| 🏰 Done — ready for your review | files changed, the comment telling you how to test it, the log |
+| ✅ Merged / 🚫 Closed | the pull request and the issue |
+
+The unhappy paths post too — planning failed, blocked at planning, abandoned, and the
+`blocked` / `no-signal` / `no-changes` outcomes — each linking the comment that explains itself.
+A Slack failure never fails a run: `notifySlack` swallows its own errors and the watcher logs a
+warning, because a missing notification is not a reason to lose an implementation.
 
 Each issue gets **one thread**: a top-level "Working on #n" message when it is picked up, then
 progress, the outcome, and the merged/closed notice as replies under it. Progress is a
@@ -100,18 +133,34 @@ Environment variables, all optional:
 
 ## Outcomes
 
-Every attempt ends in exactly one of these. In all four the label comes off the issue and a
-comment explains what happened — **re-add the label to ask for another attempt.**
+**Phase 1** ends the issue's turn in one of two ways. Either a draft pull request exists and the
+issue now wears `Sandcastle:awaiting-approval`, or the label comes off with a comment saying
+why — the agent declined to plan (`BLOCKED:`), or the run itself failed. Re-add the label to
+ask for another attempt.
+
+**Phase 3** ends in exactly one of these, each reported as a comment on the pull request:
 
 | | | Pauses? |
 |---|---|---|
-| `shipped` | Agent signalled `COMPLETE` and committed. PR opened. | yes |
-| `blocked` | Agent signalled `BLOCKED` — usually the issue needs more detail. | no |
-| `no-signal` | Run died: idle timeout, crash, or a host-side failure. | no |
+| `shipped` | Agent signalled `COMPLETE` and committed. PR marked ready for review, with testing instructions. | yes |
+| `blocked` | Agent signalled `BLOCKED` — the plan did not survive contact with the code. PR stays a draft. | no |
+| `no-signal` | Run died: idle timeout, crash, or a host-side failure. Nothing pushed. | no |
 | `no-changes` | Agent said done but committed nothing. | no |
 
-The label always coming off is deliberate. Without it, one unimplementable issue would be
-retried in a loop all night.
+In every case except `shipped` the `Sandcastle:awaiting-approval` label comes off and the state
+file is deleted, so the watcher moves on rather than re-reading an approval it already acted on.
+Starting over means re-adding the **`Sandcastle`** label, which plans from scratch — an approved
+plan is not retried on its own, because whatever broke the first attempt is still there.
+
+**How you review a plan.** Comment on the pull request. `approve`, `approved`, `lgtm`,
+`ship it`, `go ahead`, `looks good` or 👍 at the start of the comment means build it. `abandon`,
+`reject`, `cancel` or `stop` means give up. **Anything else is a change request** — the agent
+revises the plan and rewrites the description, keeping everything it read while planning. That
+default is deliberate: a comment the watcher cannot classify should start a conversation, never
+a build.
+
+The watcher ignores its own comments by an HTML marker (`<!-- sandcastle -->`), because the pull
+request is opened with your credentials — by author it cannot tell itself from you.
 
 ## Day to day
 
@@ -146,6 +195,24 @@ container's GitHub token stays scoped to reading issues. It works because Sandca
 bind-mounts the real `.git` into the container — a commit made in the sandbox is a commit
 in your repo, and survives the container and the worktree.
 
+**A human approves the plan, and the session survives the wait.** The expensive mistake is not
+a bad line of code, it is a container that spends twenty minutes building the wrong thing
+confidently. So phase 1 returns a plan and nothing else, and you approve it on a pull request.
+
+The two phases are two containers, because keeping one alive across a human review is the wrong
+shape — `idleTimeoutSeconds` exists to kill a silent agent, and an idle container burning hours
+waiting for a comment is worse than no container. What crosses the gap is the *session*:
+Sandcastle captures the agent's session JSONL to `~/.claude/projects/…` after every iteration,
+and phase 3 passes `resumeSession`, so the agent that implements is the one that planned — it
+still has the files it read and the reasoning behind the plan. Without that, phase 3 would be a
+stranger reading a summary of its own work.
+
+Three things persist, and the order matters when one is missing: `state/issue-<n>.json` is the
+fast path; the session id is mirrored into the pull request description; and the plan itself
+*is* that description. So if `~/.claude/projects` is cleared, or the plan is approved on a
+different machine, phase 3 still runs — the plan is passed in the prompt either way and the
+agent re-reads the code. Resume is an optimisation, not a dependency.
+
 **One PR at a time.** Branches are cut from `origin/main` when the issue is dispatched.
 Without the pause, a queue of issues becomes a stack of pull requests all forked from the
 same commit, conflicting with each other. Waiting means the next branch starts from a main
@@ -157,6 +224,27 @@ history, so the container would otherwise install without the `@finstreet` auth 
 on a 401 minutes in. `sandbox.mts` reads the host's copy and a startup command writes it into
 the worktree. The file holds no secret — only a `${NPM_AUTH_TOKEN}` reference, expanded inside
 the container from `.sandcastle/.env`.
+
+**Plugins are installed per run, from `.claude/settings.json`.** That file is tracked, so the
+worktree already declares which plugins this repo wants — but declaring is not installing.
+A fresh container has no `~/.claude/plugins` at all and nothing populates it: a `claude --print`
+session runs to completion with zero skills and zero MCP servers, which reads as an agent that
+ignored its tools rather than as missing setup. So `sandbox.mts` derives the work from that same
+file — fetch each marketplace's catalog, then `claude plugin install … -s user`. Installing at
+user scope keeps the container's own `enabledPlugins` out of the tracked settings the agent
+might commit. It costs about 10 seconds and 14MB per run, and adding a plugin to
+`.claude/settings.json` is the only edit needed to get it into the sandbox. `playwright` is the
+one exception, skipped by name in `sandbox.mts`: its MCP server connects and then fails on first
+use, because the image has no browsers.
+
+**Startup commands run in parallel, so ordering lives inside them.** Sandcastle executes
+`onSandboxReady` hooks with `concurrency: "unbounded"`, so two entries are two races, not two
+steps. Both dependent chains are therefore single entries joined with `&&`: `.npmrc` before
+`pnpm install`, and the marketplace catalog before `claude plugin install`. Split them and the
+install starts before its catalog exists and fails with `Plugin "x" not found in marketplace
+"y"` — a message that points at the marketplace rather than at the race, which is what makes
+this worth writing down. The two entries themselves are genuinely independent, so the plugin
+install overlaps the pnpm minute for free.
 
 **No `node_modules` is copied in.** The host tree's native packages are darwin-arm64 and the
 container needs the 15 Linux equivalents (`esbuild`, `sharp`, `@swc/core`, the Next binaries),
@@ -177,6 +265,11 @@ re-downloading everything. Telling it to copy makes it honour the mount.
 **Turbo caches typecheck failures as successes.** If a run looks too clean, re-run the
 package directly: `pnpm --filter <pkg> exec tsc --noEmit`. The agent's prompt says the same.
 
+**The first commit on every branch is empty.** A pull request needs a diff, and phase 1 is
+strictly read-only, so the host adds one empty commit (`plan(#n): …`) to give the plan somewhere
+to live. It is made with `git commit-tree` plus `update-ref` rather than `git commit`, because
+the branch is not checked out anywhere on the host at that moment. A squash merge drops it.
+
 **There is no CI on pull requests.** The only workflow is `claude.yml`, the `@claude`
 mention bot. The sandbox's green test run is the only verification a PR gets before you
 read it.
@@ -189,5 +282,10 @@ read it.
 | Slack says `not_in_channel` | `/invite @YourApp` in the target channel. |
 | Slack says `invalid_auth` | Wrong or revoked token, or a user token (`xoxp-`) where a bot token (`xoxb-`) is needed. |
 | `pnpm install` fails with `ERR_PNPM_FETCH_401` | `NPM_AUTH_TOKEN` did not reach the container. It must be listed as a key in `.sandcastle/.env` — an export in your shell alone is not forwarded. |
+| `claude mcp list` shows `finstreet-mcp` failing | `FINSTREET_MCP_TOKEN` did not reach the container — list it as a key in `.sandcastle/.env`. The URL resolving means the plugin installed; only the credential is missing. |
+| The agent never uses a skill or an MCP tool | Check the startup command output in the log. `Plugin "x" not found in marketplace "y"` means the catalog was not fetched before the install — almost always because the two were split into separate hooks, which run concurrently. |
+| The watcher ignores an approval you left | Check `.sandcastle/state/`. No file means nothing is polling that pull request — the startup log lists issues in that state. Close the PR and re-add the **Sandcastle** label. |
+| The agent re-plans instead of building | Your comment did not match an approval pattern, so it counted as feedback. Comment exactly `approve`. |
+| `no commits between main and sandcastle/issue-n` | The empty plan commit was not created, so `gh pr create` had no diff. Look for a `git commit-tree`/`update-ref` failure earlier in the log. |
 | Agent immediately reports `blocked` | Read the log. Almost always an issue too vague to implement — add detail and re-label. |
 | A run seems stuck | 15 minutes of total silence ends it. Watch progress with `tail -f .sandcastle/logs/<branch>-*.log`. |

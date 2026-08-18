@@ -22,7 +22,7 @@ about where you are.
 - Toolchain: !`node --version; git --version; (claude --version || true); (pnpm --version || echo "pnpm: not installed"); (jq --version || true)`
 - GitHub CLI: !`gh repo view --json nameWithOwner -q .nameWithOwner 2>&1 || echo "gh: unavailable"`
 - Registry config: !`cat .npmrc 2>&1 || echo ".npmrc: MISSING"`
-- Credentials reaching the container (names only): !`env | grep -oE '^(NPM_AUTH_TOKEN|GH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|SLACK_BOT_TOKEN)=' | sed 's/=$/: set/' || echo "none set"`
+- Credentials reaching the container (names only): !`env | grep -oE '^(NPM_AUTH_TOKEN|GH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|SLACK_BOT_TOKEN|FINSTREET_MCP_TOKEN)=' | sed 's/=$/: set/' || echo "none set"`
 - Installed packages: !`ls node_modules/.pnpm 2>/dev/null | wc -l`
 - Native binaries: !`ls node_modules/.pnpm 2>/dev/null | grep -ciE "linux" | sed 's/^/linux: /'; ls node_modules/.pnpm 2>/dev/null | grep -ciE "darwin" | sed 's/^/darwin: /'`
 
@@ -36,7 +36,7 @@ Two things about this environment are expected and are **not** failures:
 
 ## Checks
 
-Run all nine. Record each as PASS or FAIL with the concrete evidence (a count, a path, a
+Run all eleven. Record each as PASS or FAIL with the concrete evidence (a count, a path, a
 command's output) — never a bare assertion. A FAIL is a useful result: report it and keep
 going instead of trying to fix it.
 
@@ -81,9 +81,33 @@ going instead of trying to fix it.
    Quote any error verbatim. That is the most valuable thing this whole smoke test can tell
    us. The Playwright suite in `e2e/` is deliberately **out of scope**: it needs browsers
    that are not in this image and a running server.
-9. **Write-through.** Write your results to `SMOKE-REPORT.md` at the repo root, as a markdown
-   table of check / result / evidence, plus a short notes section for anything surprising
-   (missing tools, permission errors, unexpected git state).
+9. **Skills and MCP are wired.** Startup commands installed the plugins that
+   `.claude/settings.json` enables — that file only *declares* them, and nothing installs
+   them on its own, so skills and MCP tools exist here only if those commands worked.
+   Report all three:
+   - `claude plugin list` — every plugin and whether it is enabled;
+   - the skills on disk: `ls -d ~/.claude/plugins/cache/*/*/*/skills/*/ | wc -l` and their
+     names;
+   - `claude mcp list` — every server with its health line. `finstreet-mcp` is the one that
+     matters: it must say `✔ Connected`. Anything else means `FINSTREET_MCP_TOKEN` did not
+     reach the container, and it is worth reporting loudly, because a configured-but-dead
+     MCP server is indistinguishable from an agent that ignored its tools.
+10. **Skills and MCP actually work.** Check 9 proves they are installed and reachable; this one
+    proves you can use them. Two parts, and both belong in the report verbatim enough that a
+    reader can tell the difference between a real answer and a plausible guess:
+    - **Call an MCP tool.** Invoke `list_components` on the `finstreet-mcp` server. Report the
+      number of components it returned and the first ten names exactly as the server spelled
+      them. If the tool is not in your tool list at all, say so — that is a different failure
+      from a tool that errored, and the distinction matters.
+    - **Use the `form` skill.** Load the `finstreet-fe:form` skill and summarise how this repo
+      builds a form as a numbered list of steps, a few words each — no code. Name the skill
+      file you actually read, with its path. Do not answer from general React knowledge: if the
+      skill did not load, say that instead, because an answer that merely sounds right is worse
+      than a reported failure here.
+11. **Write-through.** Write your results to `SMOKE-REPORT.md` at the repo root, as a markdown
+    table of check / result / evidence, plus a short notes section for anything surprising
+    (missing tools, permission errors, unexpected git state). Check 10's two answers go into
+    the report in full, not summarised away into the table.
 
 ## Rules
 
@@ -96,7 +120,8 @@ going instead of trying to fix it.
 - Do not try to repair a failed install, a type error, a lint error or a broken build — the
   checks above are the only commands in scope. Report failures; don't fix them.
 - Do not print the value of any token or secret, in the report or to stdout. Saying that a
-  variable is set is what check 6 needs; the value is never useful.
+  variable is set, or that a server connected, is all checks 6 and 9 need; the value is never
+  useful. `claude mcp list` prints the MCP URL — redact any token that shows up inside it.
 - Do not open, comment on, or close GitHub issues or PRs. The `gh repo view` call in the
   snapshot above is the only GitHub interaction in scope.
 
