@@ -127,6 +127,87 @@ msgstr "Anfragedetails"
 msgid "+kZhHM"
 msgstr "Finanzierungsanträge"
 
+#: src/features/anonymizeFinancingCase/fsp/forms/anonymizeFinancingCaseForm/anonymizeFinancingCaseFormConfig.tsx:43
+msgid "zRd6yM"
+msgstr "Finanzierungsfall erfolgreich anonymisiert"
+
+#: src/features/anonymizeFinancingCase/fsp/forms/anonymizeFinancingCaseForm/anonymizeFinancingCaseFormConfig.tsx:63
+#: src/features/archiveFinancingCase/fsp/forms/archiveFinancingCaseForm/archiveFinancingCaseFormConfig.tsx:69
+#: src/features/assignCaseManager/fsp/forms/assignCaseManagerForm/useAssignCaseManagerFormConfig.tsx:59
+#: src/features/financingCaseOverview/fsp/forms/updateInternalRemarksForm/updateInternalRemarkFormConfig.tsx:60
+#: src/features/legalRepresentatives/forms/create/useCreateLegalRepresentativeFormConfig.tsx:72
+#: src/features/legalRepresentatives/forms/update/useUpdateLegalRepresentativeFormConfig.tsx:70
+#: src/features/members/common/forms/resendInvitationForm/resendInvitationFormConfig.tsx:53
+#: src/features/members/common/forms/withdrawInvitaionForm/withdrawInvitationFormConfig.tsx:53
+#: src/features/members/fsp/forms/memberForm/updateMember/updateMemberFormConfig.tsx:72
+#: src/features/members/fsp/forms/revokeMemberForm/revokeMemberFormConfig.tsx:66
+#: src/features/substitutes/fsp/forms/assignSubstitute/useAssignSubstituteFormConfig.tsx:57
+#: src/features/substitutes/fsp/forms/stopSubstitute/StopSubstituteSimpleForm.tsx:44
+#: src/shared/components/ConfirmationModal/modal.tsx:60
+msgid "EZDv9v"
+msgstr "Abbrechen"
+
+#: src/features/anonymizeFinancingCase/fsp/forms/anonymizeFinancingCaseForm/anonymizeFinancingCaseFormConfig.tsx:66
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:44
+msgid "7i5Yxy"
+msgstr "Anonymisieren"
+
+#: src/features/anonymizeFinancingCase/fsp/modals/anonymizeFinancingCaseModal/modal.tsx:25
+msgid "8xp5DN"
+msgstr "Fall anonymisieren"
+
+#: src/features/anonymizeFinancingCase/fsp/modals/anonymizeFinancingCaseModal/modal.tsx:28
+msgid "/rnUdm"
+msgstr "Möchten Sie diesen Fall wirklich anonymisieren? Diese Aktion kann nicht mehr rückgängig gemacht werden."
+
+#: src/features/archiveFinancingCase/fsp/forms/archiveFinancingCaseForm/ArchiveFinancingCaseForm.tsx:30
+msgid "X+oW9+"
+msgstr "Keine Archivierungsgründe gefunden"
+
+#: src/features/archiveFinancingCase/fsp/forms/archiveFinancingCaseForm/archiveFinancingCaseFormConfig.tsx:37
+msgid "wMq0NK"
+msgstr "Archivierungsgrund"
+
+#: src/features/archiveFinancingCase/fsp/forms/archiveFinancingCaseForm/archiveFinancingCaseFormConfig.tsx:50
+msgid "Nobdp1"
+msgstr "Finanzierungsfall erfolgreich archiviert"
+
+#: src/features/archiveFinancingCase/fsp/forms/archiveFinancingCaseForm/archiveFinancingCaseFormConfig.tsx:72
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:36
+msgid "h7WO3b"
+msgstr "Archivieren"
+
+#: src/features/archiveFinancingCase/fsp/modals/archiveFinancingCaseModal/modal.tsx:40
+msgid "v0qrKP"
+msgstr "Anfrage archivieren"
+
+#: src/features/archiveFinancingCase/fsp/modals/archiveFinancingCaseModal/modal.tsx:42
+#: src/features/assignCaseManager/fsp/modals/assignFinancingCaseModal/modal.tsx:38
+msgid "cxLY61"
+msgstr "Anfrage Nr. {financingCaseId}"
+
+#: src/features/assignCaseManager/fsp/forms/assignCaseManagerForm/AssignCaseManagerForm.tsx:25
+msgid "pChGuN"
+msgstr "Keine Bearbeiter gefunden"
+
+#: src/features/assignCaseManager/fsp/forms/assignCaseManagerForm/useAssignCaseManagerFields.ts:17
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:90
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:214
+msgid "tVcI9Z"
+msgstr "Bearbeiter"
+
+#: src/features/assignCaseManager/fsp/forms/assignCaseManagerForm/useAssignCaseManagerFormConfig.tsx:51
+msgid "gk4Pp2"
+msgstr "Sachbearbeiter erfolgreich zugewiesen"
+
+#: src/features/assignCaseManager/fsp/forms/assignCaseManagerForm/useAssignCaseManagerFormConfig.tsx:62
+msgid "Clz7km"
+msgstr "Zuweisen"
+
+#: src/features/assignCaseManager/fsp/modals/assignFinancingCaseModal/modal.tsx:36
+msgid "V6Z4hn"
+msgstr "Bearbeiter zuweisen"
+
 #: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:30
 #: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:56
 #: src/features/auth/forms/acceptInvitationForm/useAcceptInvitationFormConfig.tsx:58
@@ -170,11 +251,11 @@ msgstr "Passwort"
 msgid "T37dzW"
 msgstr "Passwort bestätigen"
 
-#: src/features/auth/forms/loginForm/LoginForm.tsx:28
+#: src/features/auth/forms/loginForm/useLoginFormConfig.tsx:55
 msgid "VKJ55q"
 msgstr "Password vergessen?"
 
-#: src/features/auth/forms/loginForm/useLoginFormConfig.tsx:53
+#: src/features/auth/forms/loginForm/useLoginFormConfig.tsx:62
 msgid "5f0Uij"
 msgstr "Jetzt anmelden"
 
@@ -340,72 +421,27 @@ msgstr "zurück zur Übersicht"
 msgid "Z4atl5"
 msgstr "Faktoringrahmen"
 
-#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:33
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:34
 msgid "gShwVL"
 msgstr "Der Fall kann zur Zeit nicht archiviert werden"
 
-#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:35
-msgid "h7WO3b"
-msgstr "Archivieren"
-
-#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:40
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:41
 msgid "hsDA40"
 msgstr "Der Fall kann zur Zeit nicht anonymisiert werden"
 
-#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:43
-msgid "7i5Yxy"
-msgstr "Anonymisieren"
-
-#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:52
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:53
 msgid "t2YMs0"
 msgstr "Der Fall kann zur Zeit nicht weitergeleitet werden"
 
-#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:56
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:57
 msgid "rw4Lde"
 msgstr "Weiterleiten"
-
-#: src/features/financingCaseOverview/fsp/forms/updateInternalRemarksForm/updateInternalRemarkFormConfig.tsx:60
-#: src/features/legalRepresentatives/forms/create/useCreateLegalRepresentativeFormConfig.tsx:72
-#: src/features/legalRepresentatives/forms/update/useUpdateLegalRepresentativeFormConfig.tsx:70
-#: src/features/members/common/forms/resendInvitationForm/resendInvitationFormConfig.tsx:53
-#: src/features/members/common/forms/withdrawInvitaionForm/withdrawInvitationFormConfig.tsx:53
-#: src/features/members/fsp/forms/memberForm/updateMember/updateMemberFormConfig.tsx:72
-#: src/features/members/fsp/forms/revokeMemberForm/revokeMemberFormConfig.tsx:66
-#: src/features/substitutes/fsp/forms/assignSubstitute/useAssignSubstituteFormConfig.tsx:57
-#: src/features/substitutes/fsp/forms/stopSubstitute/StopSubstituteSimpleForm.tsx:44
-#: src/shared/components/ConfirmationModal/modal.tsx:60
-msgid "EZDv9v"
-msgstr "Abbrechen"
 
 #: src/features/financingCaseOverview/fsp/forms/updateInternalRemarksForm/updateInternalRemarkFormConfig.tsx:63
 #: src/features/legalRepresentatives/forms/create/useCreateLegalRepresentativeFormConfig.tsx:79
 #: src/features/members/fsp/forms/memberForm/updateMember/updateMemberFormConfig.tsx:80
 msgid "7UVFRi"
 msgstr "Speichern"
-
-#: src/features/financingCaseOverview/fsp/modals/anonymizeFinancingCaseModal/modal.tsx:22
-msgid "8xp5DN"
-msgstr "Fall anonymisieren"
-
-#: src/features/financingCaseOverview/fsp/modals/anonymizeFinancingCaseModal/modal.tsx:24
-msgid "eEa/xo"
-msgstr "Möchten Sie diesen Fall wirklich anonymisieren?"
-
-#: src/features/financingCaseOverview/fsp/modals/archiveFinancingCaseModal/modal.tsx:22
-msgid "hoGAiB"
-msgstr "Fall archivieren"
-
-#: src/features/financingCaseOverview/fsp/modals/archiveFinancingCaseModal/modal.tsx:24
-msgid "q6r36H"
-msgstr "Möchten Sie diesen Fall wirklich archivieren?"
-
-#: src/features/financingCaseOverview/fsp/modals/forwardFinancingCaseModal/modal.tsx:22
-msgid "nhUgsK"
-msgstr "Fall weiterleiten"
-
-#: src/features/financingCaseOverview/fsp/modals/forwardFinancingCaseModal/modal.tsx:24
-msgid "nROYvr"
-msgstr "Möchten Sie diesen Fall wirklich weiterleiten?"
 
 #: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalDocumentsTaskPanel/index.tsx:41
 msgid "dZ4deG"
@@ -482,95 +518,98 @@ msgstr "Dokument anfordern"
 msgid "nKpC4W"
 msgstr "Factoring-Anfrage"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:95
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:245
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:62
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:209
 msgid "FxgUCY"
 msgstr "Unternehmen"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:125
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:250
-msgid "tVcI9Z"
-msgstr "Bearbeiter"
-
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:134
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:207
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:98
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:171
 msgid "EivhUD"
 msgstr "Nicht zugewiesen"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:235
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:199
 msgid "FrhHu+"
 msgstr "Anfrage"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:240
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:204
 msgid "noDPOr"
 msgstr "Factoring-Rahmen"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:255
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesGroupByItems.ts:16
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:219
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesGroupByItems.ts:14
 msgid "tzMNF3"
 msgstr "Status"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:269
+#: src/features/financingCases/lists/FspFinancingCasesList/FspFinancingCasesPresentationList.tsx:233
 msgid "suA5Hs"
 msgstr "Keine Anfragen vorhanden"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesGroupByItems.ts:12
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesGroupByItems.ts:10
 msgid "JSrXqs"
 msgstr "Keine Gruppierung"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesGroupByItems.ts:20
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesGroupByItems.ts:18
 msgid "oi5lhS"
 msgstr "Zugewiesener Bankmitarbeiter"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:24
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:42
 msgid "9Obw6C"
 msgstr "Filter"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:25
-msgid "126CEs"
-msgstr "Zurücksetzen"
-
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:27
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:48
 msgid "qi41lO"
 msgstr "Suche"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:28
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:49
 msgid "pGVsdO"
 msgstr "Suchbegriff"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:31
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:55
 msgid "DRwCDX"
 msgstr "Gruppieren nach"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:34
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:57
 msgid "J1qQnY"
 msgstr "Sortieren nach"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:10
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:60
+msgid "TwcZvE"
+msgstr "Aktiv"
+
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:61
+msgid "RfiXvX"
+msgstr "Archiviert"
+
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesRenderActions.tsx:69
+msgid "126CEs"
+msgstr "Zurücksetzen"
+
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:8
 msgid "CFnj8j"
 msgstr "Keine Sortierung"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:13
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:11
 msgid "xfp47o"
 msgstr "Erstellt am (aufsteigend)"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:17
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:15
 msgid "72ApJC"
 msgstr "Erstellt am (absteigend)"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:21
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:19
 msgid "C/M28W"
 msgstr "Status (aufsteigend)"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:25
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:23
 msgid "/CDaav"
 msgstr "Status (absteigend)"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:29
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:27
 msgid "/kE6Q0"
 msgstr "Betrag (aufsteigend)"
 
-#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:33
+#: src/features/financingCases/lists/FspFinancingCasesList/useFspFinancingCasesSortByItems.ts:31
 msgid "NB63oB"
 msgstr "Betrag (absteigend)"
 
@@ -975,9 +1014,16 @@ msgid "E9uGQx"
 msgstr "Eingaben bestätigen"
 
 #: src/shared/components/form/YesNoRadioGroup/options.ts:12
+#: src/shared/components/ValueTranslator/index.tsx:59
 msgid "zEpvia"
 msgstr "Ja"
 
 #: src/shared/components/form/YesNoRadioGroup/options.ts:13
+#: src/shared/components/ValueTranslator/index.tsx:59
 msgid "UnSKM4"
 msgstr "Nein"
+
+#: src/shared/components/ValueTranslator/index.tsx:41
+#: src/shared/components/ValueTranslator/index.tsx:75
+msgid "fAsNma"
+msgstr "-"
