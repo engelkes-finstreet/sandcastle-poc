@@ -1,0 +1,983 @@
+msgid ""
+msgstr ""
+"Language: de\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: next-intl\n"
+"X-Crowdin-SourceKey: msgstr\n"
+
+#: src/app/(auth)/konto-entsperren/page.tsx:30
+msgid "CjzEzL"
+msgstr "Konto freischalten"
+
+#: src/app/(auth)/konto-entsperren/page.tsx:33
+msgid "g6jhF6"
+msgstr "Kein Token zum Freischalten des Kontos gefunden. Bitte versuchen Sie erneut den Link in Ihrer E-Mail zu öffnen oder kontaktieren Sie Ihren Ansprechpartner."
+
+#: src/app/(auth)/konto-entsperren/page.tsx:40
+msgid "wRrf4f"
+msgstr "Ihr Konto wird gerade freigeschaltet. Bitte warten Sie einen Moment."
+
+#: src/app/(auth)/konto-entsperrung-anfordern/page.tsx:20
+msgid "Ujp26a"
+msgstr "Gesperrtes Konto freischalten"
+
+#: src/app/(auth)/konto-entsperrung-anfordern/page.tsx:22
+msgid "lT7+4p"
+msgstr "Bitte geben Sie Ihre E-Mail-Adresse ein, um Ihr Konto freizuschalten."
+
+#: src/app/(auth)/marketing-zustimmung/zustimmung-bestaetigen/page.tsx:28
+msgid "9/1hIi"
+msgstr "Vielen Dank für Ihre Anfrage"
+
+#: src/app/(auth)/marketing-zustimmung/zustimmung-bestaetigen/page.tsx:30
+msgid "MS8pAz"
+msgstr "Bitte bestätigen Sie Ihre Werbeeinwilligung mit einem Klick auf den folgenden Button:"
+
+#: src/app/(auth)/neues-passwort-vergeben/page.tsx:20
+#: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:44
+msgid "iFQpUh"
+msgstr "Passwort vergeben"
+
+#: src/app/(auth)/neues-passwort-vergeben/page.tsx:22
+msgid "ArlhbJ"
+msgstr "Bitte vergeben Sie ein neues Passwort"
+
+#: src/app/(auth)/passwort-vergessen/page.tsx:30
+msgid "LOXbLa"
+msgstr "Passwort vergessen"
+
+#: src/app/(auth)/passwort-vergessen/page.tsx:33
+msgid "iCMwPh"
+msgstr "Falls diese E-Mail-Adresse existiert, erhalten Sie eine Nachricht mit weiteren Instruktionen."
+
+#: src/app/(auth)/passwort-vergessen/page.tsx:39
+msgid "pbVh5J"
+msgstr "Bitte geben Sie Ihre E-Mail-Adresse ein"
+
+#: src/app/(auth)/passwort-zuruecksetzen/page.tsx:27
+#: src/features/auth/forms/requestPasswordResetForm/useRequestPasswordResetFormConfig.tsx:47
+#: src/features/auth/forms/resetPasswordForm/useResetPasswordFormConfig.tsx:50
+msgid "QTl16z"
+msgstr "Passwort zurücksetzen"
+
+#: src/app/(auth)/passwort-zuruecksetzen/page.tsx:29
+msgid "z0Rpx+"
+msgstr "Bitte geben Sie Ihr neues Passwort ein und bestätigen Sie dieses"
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:46
+msgid "M8TMJe"
+msgstr "Zurück"
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:50
+msgid "Af17Hq"
+msgstr "Vertretungen von {name} verwalten"
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:59
+msgid "XdRKpo"
+msgstr "Eine Vertretung für {name} ernennen"
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:62
+msgid "qILrVE"
+msgstr "Während {name} vertreten wird, können Sie keine Vertretung für ihn ernennen."
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:67
+msgid "qPqhGa"
+msgstr "Von {name} vertretene Personen"
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:70
+msgid "Qp5ERP"
+msgstr "Im Falle einer Abwesenheit können Sie hier eine Vertretung ernennen. Die ernannte Person wird über die Vertretung informiert und erhält für die Dauer der Vertretung die gleichen Email-Benachrichtigungen über die Vorgänge von {name}.<br></br>{name} erhält die Benachrichtigungen weiterhin, sodass {name} bei seiner / ihrer Rückkehr möglichst schnell auf dem aktuellen Stand ist."
+
+#: src/app/admin/benutzer/[membershipId]/page.tsx:77
+msgid "fKeMvq"
+msgstr "{absentee} wird zur Zeit vertreten durch {substitute}."
+
+#: src/app/admin/benutzer/page.tsx:52
+msgid "5vyb3y"
+msgstr "Benutzerverwaltung"
+
+#: src/app/kunde/factoring-antraege/[financingCaseId]/anfrage-details/page.tsx:17
+#: src/features/financingCaseOverview/customer/taskGroups/verifyInquiry/CustomerVerifyInquiryTaskPanel/index.tsx:28
+msgid "VSzEdb"
+msgstr "Factoringanfrage"
+
+#: src/app/kunde/factoring-antraege/[financingCaseId]/dokumente/page.tsx:24
+#: src/app/operations/factoring-antraege/[financingCaseId]/dokumente/page.tsx:32
+#: src/features/documentExchange/common/components/DocumentExchangeLoading.tsx:16
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerProvideDocumentsTaskPanel/index.tsx:38
+msgid "xFixKp"
+msgstr "Notwendige Dokumente bereitstellen"
+
+#: src/app/kunde/factoring-antraege/[financingCaseId]/vertretungsberechtigte/page.tsx:30
+#: src/app/operations/factoring-antraege/[financingCaseId]/vertretungsberechtigte/page.tsx:34
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerContractInformationTaskPanel/index.tsx:51
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerContractInformationTaskPanel/index.tsx:56
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspContractInformationTaskPanel/index.tsx:47
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspContractInformationTaskPanel/index.tsx:50
+#: src/features/legalRepresentatives/components/LegalRepresentativesLoading.tsx:15
+msgid "JpeBUc"
+msgstr "Vertretungsberechtigte Personen"
+
+#: src/app/operations/factoring-antraege/[financingCaseId]/anfrage-details/page.tsx:30
+msgid "MI7VAA"
+msgstr "Anfragedetails"
+
+#: src/app/operations/factoring-antraege/page.tsx:33
+msgid "+kZhHM"
+msgstr "Finanzierungsanträge"
+
+#: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:30
+#: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:56
+#: src/features/auth/forms/acceptInvitationForm/useAcceptInvitationFormConfig.tsx:58
+msgid "XkyrBL"
+msgstr "Jetzt registrieren"
+
+#: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:32
+msgid "hgkvbB"
+msgstr "Um Ihre Einladung anzunehmen, vergeben Sie bitte ein Passwort."
+
+#: src/features/auth/components/AcceptInvitation/acceptInvitationPageContent.tsx:58
+msgid "6JPqeb"
+msgstr "Bitte vergeben Sie sich ein Passwort, um Ihren Factoring-Antrag zu vervollständigen."
+
+#: src/features/auth/components/AcceptInvitation/TokenExpiredBanner.tsx:13
+msgid "qBjhem"
+msgstr "Einladungslink abgelaufen oder ungültig"
+
+#: src/features/auth/components/AcceptInvitation/TokenExpiredBanner.tsx:16
+msgid "sZNpVn"
+msgstr "Ihr Einladungslink ist abgelaufen oder ungültig, bitte nutzen Sie die Passwort zurücksetzen Funktion, um einen neuen anzufordern. Dieser ist für 24 Stunden gültig. Falls Sie Hilfe benötigen, kontaktieren Sie uns bitte unter den unten angegebenen Kontaktdaten."
+
+#: src/features/auth/components/UnlockAccount/index.tsx:31
+msgid "IafKgV"
+msgstr "Fehler beim Freischalten des Kontos. Bitte versuchen Sie es erneut"
+
+#: src/features/auth/components/UnlockAccount/requestAccountUnlockLink.tsx:12
+#: src/features/auth/forms/requestAccountUnlockForm/useRequestAccountUnlockFormConfig.tsx:47
+msgid "EJzr/O"
+msgstr "Freischaltung anfordern"
+
+#: src/features/auth/forms/acceptInvitationForm/useAcceptInvitationFormFields.ts:11
+#: src/features/auth/forms/loginForm/useLoginFormFields.ts:15
+#: src/features/auth/forms/resetPasswordForm/useResetPasswordFormFields.ts:11
+#: src/features/auth/forms/setNewPasswordForm/useSetNewPasswordFormFields.ts:11
+msgid "qvan14"
+msgstr "Passwort"
+
+#: src/features/auth/forms/acceptInvitationForm/useAcceptInvitationFormFields.ts:15
+#: src/features/auth/forms/resetPasswordForm/useResetPasswordFormFields.ts:15
+msgid "T37dzW"
+msgstr "Passwort bestätigen"
+
+#: src/features/auth/forms/loginForm/LoginForm.tsx:28
+msgid "VKJ55q"
+msgstr "Password vergessen?"
+
+#: src/features/auth/forms/loginForm/useLoginFormConfig.tsx:53
+msgid "5f0Uij"
+msgstr "Jetzt anmelden"
+
+#: src/features/auth/forms/loginForm/useLoginFormFields.ts:11
+#: src/features/auth/forms/requestAccountUnlockForm/useRequestAccountUnlockFormFields.ts:11
+#: src/features/auth/forms/requestPasswordResetForm/useRequestPasswordResetFormFields.ts:11
+#: src/features/legalRepresentatives/forms/useLegalRepresentativeFormFields.ts:26
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:45
+#: src/features/members/fsp/forms/memberForm/useMemberFormFields.ts:34
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:61
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:114
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:67
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:120
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:38
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:64
+msgid "ocENl4"
+msgstr "E-Mail-Adresse"
+
+#: src/features/auth/forms/setNewPasswordForm/useSetNewPasswordFormConfig.tsx:42
+msgid "5Zt6MM"
+msgstr "Passwort ändern"
+
+#: src/features/customer/forms/confirmMarketingAgreement/confirmMarketingAgreementFormAction.ts:28
+#: src/shared/backend/createMockServerFetchFunction.ts:72
+#: src/shared/backend/createServerFetchFunction.ts:70
+#: src/shared/backend/createServerFetchFunction.ts:89
+#: src/shared/backend/createServerFetchFunction.ts:103
+#: src/shared/utils/uploadFileToGoogle.ts:32
+msgid "vbOYDu"
+msgstr "Ein Fehler ist aufgetreten. Bitte versuchen Sie es später noch einmal."
+
+#: src/features/customer/forms/confirmMarketingAgreement/confirmMarketingAgreementFormConfig.tsx:51
+msgid "eCaMec"
+msgstr "Werbeeinwilligung bestätigen"
+
+#: src/features/documentExchange/common/components/DocumentExchangeLoading.tsx:19
+#: src/features/documentExchange/common/components/DocumentExchangePageContent.tsx:31
+msgid "KoE8Gs"
+msgstr "Wir benötigen noch weitere Dokumente von Ihnen. Um eine zeitnahe Bearbeitung zu gewährleisten, stellen Sie uns bitte alle benötigten Dokumente zur Verfügung."
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:67
+msgid "YKz6zM"
+msgstr "Der Download ist fehlgeschlagen. Bitte versuchen Sie es erneut."
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:84
+msgid "d1OgED"
+msgstr "(optional)"
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:85
+msgid "fEnWi0"
+msgstr "Hochladen fehlgeschlagen"
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:86
+msgid "C4uYi7"
+msgstr "Ziehen Sie die Datei hier hin, um sie hochzuladen"
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:87
+msgid "U38Osz"
+msgstr "erlaubte Dateiformate:"
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:88
+msgid "+VtuKI"
+msgstr "Maximale Dateigröße:"
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:89
+msgid "hqhFK1"
+msgstr "Hochladen..."
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestDisplay.tsx:90
+msgid "aHapcl"
+msgstr "Hochgeladene Dokumente"
+
+#: src/features/documentExchange/common/components/DocumentExchangeRequestGroup.tsx:52
+msgid "ai/FrN"
+msgstr "({uploadedRequiredAmount, number} von {totalRequiredAmount, number} Pflichtdokumente eingereicht)"
+
+#: src/features/financingCaseOverview/customer/CustomerFinancingCaseOverviewPageHeader.tsx:43
+#: src/features/financingCaseOverview/customer/CustomerFinancingCaseOverviewSubPageHeader.tsx:32
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewSubPageHeader.tsx:31
+#: src/layouts/customer/CustomerFinancingCaseOverviewSubPageHeader.tsx:35
+#: src/shared/components/SubPageHeaderSkeleton/index.tsx:29
+msgid "1O2WKc"
+msgstr "Zurück zur Anfrage"
+
+#: src/features/financingCaseOverview/customer/CustomerFinancingCaseOverviewPageHeader.tsx:49
+msgid "tTYePC"
+msgstr "Factoringrahmen"
+
+#: src/features/financingCaseOverview/customer/CustomerFinancingCaseOverviewPageHeader.tsx:53
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeader.tsx:62
+msgid "PFWRt+"
+msgstr "Anfrage vom"
+
+#: src/features/financingCaseOverview/customer/taskGroups/documents/CustomerDocumentsTaskGroup.tsx:22
+msgid "cGfc1w"
+msgstr "Ihre Unterlagen"
+
+#: src/features/financingCaseOverview/customer/taskGroups/documents/CustomerDownloadDocumentsTaskPanel/index.tsx:34
+msgid "GfxYMJ"
+msgstr "Dokumente herunterladen"
+
+#: src/features/financingCaseOverview/customer/taskGroups/documents/CustomerDownloadDocumentsTaskPanel/index.tsx:39
+msgid "HP0l1A"
+msgstr "Hier finden Sie alle Dokumente, die Ihnen bereitgestellt werden."
+
+#: src/features/financingCaseOverview/customer/taskGroups/documents/CustomerDownloadDocumentsTaskPanel/index.tsx:49
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalDocumentsTaskPanel/index.tsx:50
+#: src/features/financingCaseOverview/fsp/taskGroups/onboading/FspProvideDocumentsForCustomerTaskPanel/index.tsx:52
+msgid "iQTe/3"
+msgstr "bereitgestellt am"
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerContractInformationTaskPanel/index.tsx:36
+msgid "H7utym"
+msgstr "Informationen zum Vertragsabschluss ergänzen"
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerContractInformationTaskPanel/index.tsx:42
+msgid "MEqu4w"
+msgstr "Wir benötigen vor dem Vertragsabschluss noch einige Informationen von Ihnen. Bitte erfassen Sie die notwendigen Daten:"
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerContractInformationTaskPanel/index.tsx:52
+msgid "0DAucm"
+msgstr "Daten ergänzen"
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerContractInformationTaskPanel/index.tsx:59
+msgid "aT/Oge"
+msgstr "Bitte wählen Sie die Vertretungsberechtigten aus, die den Vertrag unterzeichnen sollen."
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerFinancingCaseTaskGroup.tsx:28
+msgid "QixtcX"
+msgstr "Ihr Factoringantrag"
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerProvideDocumentsTaskPanel/index.tsx:42
+msgid "ENWjIt"
+msgstr "{uploaded, number} von {total, number} hochgeladen"
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerProvideDocumentsTaskPanel/index.tsx:57
+msgid "ANAssr"
+msgstr "Um eine zeitnahe Bearbeitung zu gewährleisten, stellen Sie uns bitte alle benötigten Dokumente zur Verfügung."
+
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerProvideDocumentsTaskPanel/index.tsx:64
+#: src/features/financingCaseOverview/customer/taskGroups/financingCase/CustomerProvideDocumentsTaskPanel/index.tsx:69
+msgid "qB1nPm"
+msgstr "Zu den Dokumenten"
+
+#: src/features/financingCaseOverview/customer/taskGroups/verifyInquiry/CustomerVerifyInquiryTaskGroup.tsx:15
+msgid "pZDljr"
+msgstr "Ihre Anfrage"
+
+#: src/features/financingCaseOverview/customer/taskGroups/verifyInquiry/CustomerVerifyInquiryTaskPanel/index.tsx:38
+msgid "eaf510"
+msgstr "Auf Basis Ihrer Angaben berechnen wir die Factoringkonditionen."
+
+#: src/features/financingCaseOverview/customer/taskGroups/verifyInquiry/CustomerVerifyInquiryTaskPanel/index.tsx:44
+#: src/features/financingCaseOverview/customer/taskGroups/verifyInquiry/CustomerVerifyInquiryTaskPanel/index.tsx:49
+msgid "0NPKdk"
+msgstr "Zu den Anfragedetails"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeader.tsx:31
+msgid "UXvZXo"
+msgstr "zurück zur Übersicht"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeader.tsx:46
+msgid "Z4atl5"
+msgstr "Faktoringrahmen"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:33
+msgid "gShwVL"
+msgstr "Der Fall kann zur Zeit nicht archiviert werden"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:35
+msgid "h7WO3b"
+msgstr "Archivieren"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:40
+msgid "hsDA40"
+msgstr "Der Fall kann zur Zeit nicht anonymisiert werden"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:43
+msgid "7i5Yxy"
+msgstr "Anonymisieren"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:52
+msgid "t2YMs0"
+msgstr "Der Fall kann zur Zeit nicht weitergeleitet werden"
+
+#: src/features/financingCaseOverview/fsp/components/FspFinancingCaseOverviewPageHeaderActions.tsx:56
+msgid "rw4Lde"
+msgstr "Weiterleiten"
+
+#: src/features/financingCaseOverview/fsp/forms/updateInternalRemarksForm/updateInternalRemarkFormConfig.tsx:60
+#: src/features/legalRepresentatives/forms/create/useCreateLegalRepresentativeFormConfig.tsx:72
+#: src/features/legalRepresentatives/forms/update/useUpdateLegalRepresentativeFormConfig.tsx:70
+#: src/features/members/common/forms/resendInvitationForm/resendInvitationFormConfig.tsx:53
+#: src/features/members/common/forms/withdrawInvitaionForm/withdrawInvitationFormConfig.tsx:53
+#: src/features/members/fsp/forms/memberForm/updateMember/updateMemberFormConfig.tsx:72
+#: src/features/members/fsp/forms/revokeMemberForm/revokeMemberFormConfig.tsx:66
+#: src/features/substitutes/fsp/forms/assignSubstitute/useAssignSubstituteFormConfig.tsx:57
+#: src/features/substitutes/fsp/forms/stopSubstitute/StopSubstituteSimpleForm.tsx:44
+#: src/shared/components/ConfirmationModal/modal.tsx:60
+msgid "EZDv9v"
+msgstr "Abbrechen"
+
+#: src/features/financingCaseOverview/fsp/forms/updateInternalRemarksForm/updateInternalRemarkFormConfig.tsx:63
+#: src/features/legalRepresentatives/forms/create/useCreateLegalRepresentativeFormConfig.tsx:79
+#: src/features/members/fsp/forms/memberForm/updateMember/updateMemberFormConfig.tsx:80
+msgid "7UVFRi"
+msgstr "Speichern"
+
+#: src/features/financingCaseOverview/fsp/modals/anonymizeFinancingCaseModal/modal.tsx:22
+msgid "8xp5DN"
+msgstr "Fall anonymisieren"
+
+#: src/features/financingCaseOverview/fsp/modals/anonymizeFinancingCaseModal/modal.tsx:24
+msgid "eEa/xo"
+msgstr "Möchten Sie diesen Fall wirklich anonymisieren?"
+
+#: src/features/financingCaseOverview/fsp/modals/archiveFinancingCaseModal/modal.tsx:22
+msgid "hoGAiB"
+msgstr "Fall archivieren"
+
+#: src/features/financingCaseOverview/fsp/modals/archiveFinancingCaseModal/modal.tsx:24
+msgid "q6r36H"
+msgstr "Möchten Sie diesen Fall wirklich archivieren?"
+
+#: src/features/financingCaseOverview/fsp/modals/forwardFinancingCaseModal/modal.tsx:22
+msgid "nhUgsK"
+msgstr "Fall weiterleiten"
+
+#: src/features/financingCaseOverview/fsp/modals/forwardFinancingCaseModal/modal.tsx:24
+msgid "nROYvr"
+msgstr "Möchten Sie diesen Fall wirklich weiterleiten?"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalDocumentsTaskPanel/index.tsx:41
+msgid "dZ4deG"
+msgstr "Interne Dokumente"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalDocumentsTaskPanel/index.tsx:62
+msgid "CQcOWI"
+msgstr "Dokumente hochladen"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalRemarksTaskPanel/index.tsx:44
+msgid "7fwnzq"
+msgstr "Anmerkungen"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalRemarksTaskPanel/index.tsx:70
+#: src/features/legalRepresentatives/components/LegalRepresentativePanel.tsx:94
+msgid "lo+Rw8"
+msgstr "Bearbeiten"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalRemarksTaskPanel/index.tsx:86
+msgid "YE+amO"
+msgstr "Noch keine internen Bemerkungen vorhanden."
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalRemarksTaskPanel/index.tsx:96
+msgid "58a47l"
+msgstr "Anmerkungen hinzufügen"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/internal/FspInternalTaskGroup.tsx:18
+msgid "qjDKcs"
+msgstr "Intern"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/onboading/FspOnboardingTaskGroup.tsx:17
+msgid "GjrgLY"
+msgstr "Onboarding"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/onboading/FspProvideDocumentsForCustomerTaskPanel/index.tsx:43
+msgid "lg+fnJ"
+msgstr "Dokumente für den Kunden"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/onboading/FspProvideDocumentsForCustomerTaskPanel/index.tsx:64
+msgid "WoYaa6"
+msgstr "Dokument hochladen"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspContractInformationTaskPanel/index.tsx:38
+msgid "2MIrHT"
+msgstr "Informationen zum Vertragsabschluss"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspContractInformationTaskPanel/index.tsx:48
+msgid "O/ByxE"
+msgstr "Daten einsehen"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspInquiryTaskPanel/index.tsx:29
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspInquiryTaskPanel/index.tsx:33
+msgid "xeqRop"
+msgstr "Konditionenanfrage"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspProvidedDocumentsTaskPanel/index.tsx:44
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspProvidedDocumentsTaskPanel/index.tsx:48
+msgid "jorYTA"
+msgstr "Dokumente vom Kunden"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspProvidedDocumentsTaskPanel/index.tsx:51
+msgid "Zcbg02"
+msgstr "hochgeladen"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspProvidedDocumentsTaskPanel/index.tsx:53
+msgid "fAJd6N"
+msgstr "<strong>{completedCount, number}</strong> von <strong>{totalCount, number}</strong>"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspProvidedDocumentsTaskPanel/index.tsx:71
+msgid "zafHS0"
+msgstr "Dokument anfordern"
+
+#: src/features/financingCaseOverview/fsp/taskGroups/verifyInquiry/FspVerifyInquiryTaskGroup.tsx:21
+msgid "nKpC4W"
+msgstr "Factoring-Anfrage"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:95
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:245
+msgid "FxgUCY"
+msgstr "Unternehmen"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:125
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:250
+msgid "tVcI9Z"
+msgstr "Bearbeiter"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:134
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:207
+msgid "EivhUD"
+msgstr "Nicht zugewiesen"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:235
+msgid "FrhHu+"
+msgstr "Anfrage"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:240
+msgid "noDPOr"
+msgstr "Factoring-Rahmen"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:255
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesGroupByItems.ts:16
+msgid "tzMNF3"
+msgstr "Status"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/FspFinancingCasesPresentationList.tsx:269
+msgid "suA5Hs"
+msgstr "Keine Anfragen vorhanden"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesGroupByItems.ts:12
+msgid "JSrXqs"
+msgstr "Keine Gruppierung"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesGroupByItems.ts:20
+msgid "oi5lhS"
+msgstr "Zugewiesener Bankmitarbeiter"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:24
+msgid "9Obw6C"
+msgstr "Filter"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:25
+msgid "126CEs"
+msgstr "Zurücksetzen"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:27
+msgid "qi41lO"
+msgstr "Suche"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:28
+msgid "pGVsdO"
+msgstr "Suchbegriff"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:31
+msgid "DRwCDX"
+msgstr "Gruppieren nach"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesRenderActions.tsx:34
+msgid "J1qQnY"
+msgstr "Sortieren nach"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:10
+msgid "CFnj8j"
+msgstr "Keine Sortierung"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:13
+msgid "xfp47o"
+msgstr "Erstellt am (aufsteigend)"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:17
+msgid "72ApJC"
+msgstr "Erstellt am (absteigend)"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:21
+msgid "C/M28W"
+msgstr "Status (aufsteigend)"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:25
+msgid "/CDaav"
+msgstr "Status (absteigend)"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:29
+msgid "/kE6Q0"
+msgstr "Betrag (aufsteigend)"
+
+#: src/features/financingCases/lists/OperationsFinancingCasesList/useFspFinancingCasesSortByItems.ts:33
+msgid "NB63oB"
+msgstr "Betrag (absteigend)"
+
+#: src/features/legalRepresentatives/components/ConfirmLegalRepresentativesButton.tsx:62
+msgid "kzN52d"
+msgstr "Vertretungsberechtigte Personen bestätigen"
+
+#: src/features/legalRepresentatives/components/EmptyLegalRepresentative.tsx:43
+msgid "hfpT7D"
+msgstr "Neue Vertretungsberechtigte Person anlegen"
+
+#: src/features/legalRepresentatives/components/LegalRepresentativePanel.tsx:75
+msgid "pPmDDi"
+msgstr "alleinvertretungsberechtigt"
+
+#: src/features/legalRepresentatives/components/LegalRepresentativePanel.tsx:101
+#: src/features/legalRepresentatives/forms/delete/useDeleteLegalRepresentativeFormConfig.tsx:68
+msgid "csz2dV"
+msgstr "Löschen"
+
+#: src/features/legalRepresentatives/components/LegalRepresentativePanel.tsx:111
+msgid "LlM9zx"
+msgstr "Mobil"
+
+#: src/features/legalRepresentatives/components/LegalRepresentativePanel.tsx:119
+msgid "HEfhYI"
+msgstr "E-Mail"
+
+#: src/features/legalRepresentatives/components/LegalRepresentativesLoading.tsx:18
+msgid "lQx8N7"
+msgstr "Bitte erfassen Sie alle erforderlichen Angaben zu bis zu zwei Vertretungsberechtigten, die für das Unternehmen berechtigt sind, einen Vertrag abzuschließen (Einzel- oder Gesamtvertretung)."
+
+#: src/features/legalRepresentatives/forms/LegalRepresentativeFormFields.tsx:30
+#: src/features/members/fsp/forms/memberForm/MemberFormFields.tsx:28
+msgid "2Ox+zF"
+msgstr "Angaben zur Person"
+
+#: src/features/legalRepresentatives/forms/update/useUpdateLegalRepresentativeFormConfig.tsx:77
+msgid "DNGH0E"
+msgstr "Aktualisieren"
+
+#: src/features/legalRepresentatives/forms/useLegalRepresentativeFormFields.ts:14
+msgid "abx68a"
+msgstr "Diese Person ist alleinvertretungsberechtigt."
+
+#: src/features/legalRepresentatives/forms/useLegalRepresentativeFormFields.ts:18
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:37
+#: src/features/members/fsp/forms/memberForm/useMemberFormFields.ts:26
+msgid "uzYEs0"
+msgstr "Vorname"
+
+#: src/features/legalRepresentatives/forms/useLegalRepresentativeFormFields.ts:22
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:41
+#: src/features/members/fsp/forms/memberForm/useMemberFormFields.ts:30
+msgid "E46k0V"
+msgstr "Nachname"
+
+#: src/features/legalRepresentatives/forms/useLegalRepresentativeFormFields.ts:30
+msgid "35KTpe"
+msgstr "Telefonnummer"
+
+#: src/features/legalRepresentatives/modals/CreateLegalRepresentativeModal/modal.tsx:24
+msgid "R2iPGQ"
+msgstr "Vertretungsberechtigte Person anlegen"
+
+#: src/features/legalRepresentatives/modals/DeleteLegalRepresentativeModal/modal.tsx:26
+msgid "8M1q+q"
+msgstr "Vertretungsberechtigte Person löschen"
+
+#: src/features/legalRepresentatives/modals/DeleteLegalRepresentativeModal/modal.tsx:30
+msgid "kCtnH/"
+msgstr "Möchten Sie {name} wirklich als vertretungsberechtigte Person löschen?"
+
+#: src/features/legalRepresentatives/modals/UpdateLegalRepresentativeModal/modal.tsx:24
+msgid "esKXHM"
+msgstr "Vertretungsberechtigte Person bearbeiten"
+
+#: src/features/members/common/forms/resendInvitationForm/resendInvitationFormConfig.tsx:63
+#: src/features/members/common/modals/ResendInvitationModal/index.tsx:26
+msgid "iUC87F"
+msgstr "Einladung erneut senden"
+
+#: src/features/members/common/forms/withdrawInvitaionForm/withdrawInvitationFormConfig.tsx:64
+#: src/features/members/common/modals/WithdrawInvitationModal/index.tsx:27
+msgid "mAw6KU"
+msgstr "Einladung zurückziehen"
+
+#: src/features/members/common/modals/ResendInvitationModal/index.tsx:30
+msgid "RJZwfm"
+msgstr "Möchten Sie die Einladung an {userName} erneut senden?"
+
+#: src/features/members/common/modals/ResendInvitationModal/index.tsx:35
+msgid "KH+Wmf"
+msgstr "Die Einladung wird an die E-Mail-Adresse {email} erneut gesendet."
+
+#: src/features/members/common/modals/WithdrawInvitationModal/index.tsx:31
+msgid "b5lIGh"
+msgstr "Möchten Sie die Einladung für <name></name> zurückziehen?"
+
+#: src/features/members/common/modals/WithdrawInvitationModal/index.tsx:39
+msgid "/sxjS1"
+msgstr "Die Einladung an {email} wird zurückgezogen."
+
+#: src/features/members/customer/modals/DeleteUserModal/DeleteUserModal.tsx:26
+#: src/features/members/fsp/forms/revokeMemberForm/revokeMemberFormConfig.tsx:77
+#: src/features/members/fsp/modals/RevokeMemberModal/index.tsx:26
+msgid "brnaTr"
+msgstr "Benutzer löschen"
+
+#: src/features/members/customer/modals/DeleteUserModal/DeleteUserModal.tsx:30
+msgid "BuqSIN"
+msgstr "Möchten Sie den Benutzer {name} ({email}) wirklich aus Ihrem Unternehmen entfernen?"
+
+#: src/features/members/customer/modals/DeleteUserModal/DeleteUserModal.tsx:36
+msgid "Cl7cNa"
+msgstr "Der Benutzer verliert Zugriff auf alle Anträge und kann nicht länger auf diese Daten zugreifen"
+
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:49
+#: src/features/members/fsp/forms/memberForm/useMemberFormFields.ts:38
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:66
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:124
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:72
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:130
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:43
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:72
+msgid "fv4YEl"
+msgstr "Abteilung"
+
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:57
+#: src/features/members/fsp/forms/memberForm/useMemberFormFields.ts:46
+msgid "sWZu5s"
+msgstr "Signatur WEG-Kredite"
+
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:65
+#: src/features/members/fsp/forms/memberForm/useMemberFormFields.ts:54
+msgid "3A5wXs"
+msgstr "Zins- & Konditionsänderungen"
+
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:104
+#: src/layouts/fsp/FspFinancingCaseOverviewSubPageHeader.tsx:37
+msgid "Z/0NFk"
+msgstr "zurück"
+
+#: src/features/members/fsp/forms/memberForm/inviteMember/inviteMemberFormConfig.tsx:114
+msgid "ttibjt"
+msgstr "Benutzer speichern"
+
+#: src/features/members/fsp/forms/memberForm/MemberFormFields.tsx:35
+msgid "lm9pyn"
+msgstr "An diese E-Mail-Adresse wird ein Link zur Passwortvergabe und Freischaltung gesendet."
+
+#: src/features/members/fsp/forms/memberForm/MemberFormFields.tsx:45
+msgid "QWrQAP"
+msgstr "Berechtigungen"
+
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:56
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:82
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:62
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:88
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:33
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:54
+msgid "HAlOn1"
+msgstr "Name"
+
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:71
+msgid "/dWXVu"
+msgstr "Vertreten durch"
+
+#: src/features/members/fsp/lists/MembersList/MembersListPresentation.tsx:196
+msgid "uws673"
+msgstr "Keine Benutzer vorhanden"
+
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:77
+msgid "1hqlKA"
+msgstr "Eingeladen am"
+
+#: src/features/members/fsp/lists/MembersPendingInvitationsList/MembersPendingInvitationsPresentation.tsx:199
+msgid "GX9jMh"
+msgstr "Keine eingeladene Benutzer vorhanden"
+
+#: src/features/members/fsp/modals/InviteMembersModal/index.tsx:22
+msgid "ACJtcv"
+msgstr "Neue Benutzer einladen"
+
+#: src/features/members/fsp/modals/InviteMembersModal/OpenInviteMemberModalButton.tsx:36
+msgid "UYrun4"
+msgstr "Neuen Benutzer einladen"
+
+#: src/features/members/fsp/modals/RevokeMemberModal/index.tsx:30
+msgid "CwKesO"
+msgstr "<p>Möchten Sie den Benutzer \"<name></name>\" wirklich löschen?</p><p>Die laufenden Anfragen werden an die BfW zur weiteren Bearbeitung überführt und können von den Distributoren neu zugewiesen werden.</p>"
+
+#: src/features/members/fsp/modals/RevokeMemberModal/index.tsx:39
+msgid "wWL3uU"
+msgstr "Dieser Vorgang kann nicht rückgängig gemacht werden."
+
+#: src/features/substitutes/fsp/forms/assignSubstitute/useAssignSubstituteFormConfig.tsx:64
+#: src/features/substitutes/fsp/modals/AddSubstituteModal/modal.tsx:25
+msgid "CpOq+u"
+msgstr "Vertretung ernennen"
+
+#: src/features/substitutes/fsp/forms/assignSubstitute/useAssignSubstituteFormFields.ts:24
+msgid "ioGSuZ"
+msgstr "Vertretende Person"
+
+#: src/features/substitutes/fsp/forms/stopSubstitute/StopSubstituteSimpleForm.tsx:35
+msgid "rKObOU"
+msgstr "Beim Beenden der Vertretung ist ein Fehler aufgetreten."
+
+#: src/features/substitutes/fsp/forms/stopSubstitute/StopSubstituteSimpleForm.tsx:52
+#: src/features/substitutes/fsp/modals/StopSubstituteModal/OpenStopSubstituteModalButton.tsx:25
+msgid "4NDEgZ"
+msgstr "Vertretung beenden"
+
+#: src/features/substitutes/fsp/interactiveLists/mySubstitutes/MySubstitutesPresentationList.tsx:106
+msgid "sLzdWQ"
+msgstr "Sie vertreten zur Zeit niemanden"
+
+#: src/features/substitutes/fsp/modals/StopSubstituteModal/modal.tsx:23
+msgid "qdvuUr"
+msgstr "Vertretung beenden?"
+
+#: src/features/substitutes/fsp/modals/StopSubstituteModal/modal.tsx:25
+msgid "BgyI4a"
+msgstr "Sind Sie sicher, dass sie die Vertretung beenden wollen?"
+
+#: src/i18n/useTranslatedError.ts:11
+#: src/i18n/useTranslatedError.ts:31
+#: src/i18n/useTranslatedError.ts:37
+msgid "PxpEO3"
+msgstr "Pflichtfeld"
+
+#: src/i18n/useTranslatedError.ts:14
+msgid "UtbItV"
+msgstr "Eine Zahl muss eingegeben werden"
+
+#: src/i18n/useTranslatedError.ts:17
+msgid "Dot2ot"
+msgstr "Ungültiges Datum"
+
+#: src/i18n/useTranslatedError.ts:20
+#: src/i18n/useTranslatedError.ts:33
+#: src/i18n/useTranslatedError.ts:148
+#: src/i18n/useTranslatedError.ts:150
+msgid "131OAi"
+msgstr "Ungültige Eingabe"
+
+#: src/i18n/useTranslatedError.ts:23
+msgid "1fI5Hb"
+msgstr "Ungültige E-Mail-Adresse"
+
+#: src/i18n/useTranslatedError.ts:26
+msgid "fsxpdy"
+msgstr "Ungültige URL"
+
+#: src/i18n/useTranslatedError.ts:28
+msgid "yvtP7T"
+msgstr "Ein Text muss eingegeben werden"
+
+#: src/i18n/useTranslatedError.ts:39
+msgid "4pqHXo"
+msgstr "Mindestens {min} Zeichen erforderlich"
+
+#: src/i18n/useTranslatedError.ts:44
+msgid "CaFK9T"
+msgstr "Der Wert muss größer sein als {min}"
+
+#: src/i18n/useTranslatedError.ts:48
+msgid "6pARXY"
+msgstr "Der Wert ist zu klein"
+
+#: src/i18n/useTranslatedError.ts:51
+msgid "U5NtF6"
+msgstr "Maximal {max} Zeichen erlaubt"
+
+#: src/i18n/useTranslatedError.ts:56
+msgid "tkmrFS"
+msgstr "Der Wert muss kleiner als {max} sein"
+
+#: src/i18n/useTranslatedError.ts:60
+msgid "/R0e1v"
+msgstr "Der Wert ist zu groß"
+
+#: src/i18n/useTranslatedError.ts:66
+msgid "rxaEox"
+msgstr "Die Eingabe und der Name des Unternehmens stimmen nicht überein."
+
+#: src/i18n/useTranslatedError.ts:72
+msgid "MS/1J4"
+msgstr "Bitte geben Sie eine gültige Telefonnummer ein."
+
+#: src/i18n/useTranslatedError.ts:75
+msgid "xerhI1"
+msgstr "Ungültige Postleitzahl"
+
+#: src/i18n/useTranslatedError.ts:78
+msgid "k3ZIH4"
+msgstr "Bitte geben Sie eine gültige IBAN ohne Leerzeichen an"
+
+#: src/i18n/useTranslatedError.ts:84
+msgid "Sv7MrW"
+msgstr "Die Steuernummer darf nur aus Zahlen und \"/\" bestehen"
+
+#: src/i18n/useTranslatedError.ts:89
+msgid "BjQIkd"
+msgstr "Dieses Feld muss bestätigt werden"
+
+#: src/i18n/useTranslatedError.ts:93
+msgid "7Q7Hiu"
+msgstr "Bitte geben Sie maximal {maxWords} Wörter ein"
+
+#: src/i18n/useTranslatedError.ts:98
+msgid "6lXoqZ"
+msgstr "Ungültiges Geburtsdatum"
+
+#: src/i18n/useTranslatedError.ts:101
+msgid "4gE9xq"
+msgstr "Das Datum darf nicht in der Zukunft liegen"
+
+#: src/i18n/useTranslatedError.ts:105
+msgid "OBj4T2"
+msgstr "Es muss mindestens eine Rolle ausgewählt sein"
+
+#: src/i18n/useTranslatedError.ts:109
+msgid "sha4aC"
+msgstr "Das Passwort muss mindestens 12 Zeichen lang sein und mindestens einen Großbuchstaben, einen Kleinbuchstaben, ein Sonderzeichen und eine Zahl enthalten"
+
+#: src/i18n/useTranslatedError.ts:115
+msgid "TMpbvi"
+msgstr "Bitte geben Sie ein gültiges IK-Kennzeichen ein."
+
+#: src/i18n/useTranslatedError.ts:119
+msgid "w/YIZj"
+msgstr "Das Enddatum muss nach dem Startdatum liegen"
+
+#: src/i18n/useTranslatedError.ts:123
+msgid "aSVj0Y"
+msgstr "Das Datum darf nicht vor dem {date} liegen"
+
+#: src/i18n/useTranslatedError.ts:129
+msgid "VG6F9U"
+msgstr "Das Datum darf nicht nach dem {date} liegen"
+
+#: src/i18n/useTranslatedError.ts:135
+msgid "i83Ucc"
+msgstr "Das Baujahr darf nicht älter als {year} sein"
+
+#: src/i18n/useTranslatedError.ts:142
+msgid "B7qgZE"
+msgstr "Bitte wählen Sie eine Finanzierung aus."
+
+#: src/i18n/useTranslatedError.ts:144
+msgid "tOsgUN"
+msgstr "Die Passwörter stimmen nicht überein."
+
+#: src/layouts/admin/AdminLayoutHeader.tsx:16
+#: src/layouts/fsp/FspLayoutHeader.tsx:23
+msgid "enYUhB"
+msgstr "Abmelden"
+
+#: src/layouts/customer/CustomerFinancingCaseOverviewDocumentExchangePageHeader.tsx:28
+#: src/layouts/fsp/FspFinancingCaseOverviewDocumentExchangePageHeader.tsx:28
+msgid "NL5RD9"
+msgstr "Hochgeladene Dokumente ausblenden"
+
+#: src/layouts/fsp/FspLayoutHeader.tsx:27
+msgid "SGl8EX"
+msgstr "Anmelden"
+
+#: src/shared/backend/createMockServerFetchFunction.ts:59
+#: src/shared/backend/createServerFetchFunction.ts:56
+msgid "07YYgK"
+msgstr "Es ist ein Validierungsfehler aufgetreten. Bitte überprüfen Sie Ihre Eingaben und versuchen Sie es erneut."
+
+#: src/shared/backend/createMockServerFetchFunction.ts:87
+#: src/shared/backend/createServerFetchFunction.ts:119
+msgid "+zhb7M"
+msgstr "Ein Netzwerkfehler ist aufgetreten. Bitte versuchen Sie es später noch einmal."
+
+#: src/shared/backend/models/fspMembers/getFspMembers.ts:25
+msgid "U3+K06"
+msgstr "Aktive Benutzer"
+
+#: src/shared/backend/models/fspMembers/getPendingFspInvitations.ts:26
+msgid "bzjFUX"
+msgstr "Eingeladene Benutzer"
+
+#: src/shared/components/ConfirmationModal/modal.tsx:68
+msgid "QpcfhN"
+msgstr "Eingaben final bestätigen"
+
+#: src/shared/components/ConfirmationModal/modal.tsx:81
+msgid "16vdVB"
+msgstr "Bitte überprüfen Sie Ihre Angaben sorgfältig. Nach der Bestätigung sind diese verbindlich und können nur noch durch die BfW geändert werden. Möchten Sie fortfahren?"
+
+#: src/shared/components/ConfirmationModal/modal.tsx:84
+msgid "esAFfX"
+msgstr "Nach der Bestätigung kann der Kunde die Angaben nicht mehr ändern. Sie können die Angaben weiterhin bearbeiten. Möchten Sie fortfahren?"
+
+#: src/shared/components/ConfirmationModal/modal.tsx:91
+msgid "E9uGQx"
+msgstr "Eingaben bestätigen"
+
+#: src/shared/components/form/YesNoRadioGroup/options.ts:12
+msgid "zEpvia"
+msgstr "Ja"
+
+#: src/shared/components/form/YesNoRadioGroup/options.ts:13
+msgid "UnSKM4"
+msgstr "Nein"
