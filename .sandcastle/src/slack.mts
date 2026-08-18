@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 // Notifications are best-effort. A watcher that dies because Slack had a bad
 // minute would be worse than one that misses a ping.
 
-const ENV_FILE = fileURLToPath(new URL(".env", import.meta.url));
+const ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
 
 /**
  * Read a single key out of .sandcastle/.env rather than loading the file.

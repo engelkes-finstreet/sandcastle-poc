@@ -23,7 +23,7 @@ const result = await run({
   // Sonnet is plenty for a checklist; the model choice is not what's under test.
   agent: claudeCode("sonnet"),
 
-  promptFile: "./.sandcastle/smoke-test.md",
+  promptFile: "./.sandcastle/prompts/smoke-test.md",
 
   // Single shot. The watcher in ./main.mts is what runs repeatedly.
   maxIterations: 1,

@@ -14,9 +14,10 @@
     "e2e:report": "playwright show-report",
     "e2e:headed": "playwright test --headed --project=chromium",
     "e2e:standalone": "pnpm build:e2e && E2E_STANDALONE=true pnpm e2e",
-    "sandcastle": "tsx .sandcastle/main.mts",
+    "sandcastle": "tsx .sandcastle/src/main.mts",
     "sandcastle:build-image": "sandcastle docker build-image --dockerfile .sandcastle/Dockerfile",
-    "sandcastle:smoke": "tsx .sandcastle/smoke.mts"
+    "sandcastle:smoke": "tsx .sandcastle/src/smoke.mts",
+    "sandcastle:typecheck": "tsc --noEmit -p .sandcastle"
   },
   "dependencies": {
     "@finstreet/forms": "0.0.200",

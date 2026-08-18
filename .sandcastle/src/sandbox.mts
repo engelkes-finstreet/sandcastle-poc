@@ -16,7 +16,7 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 // there for why copy is load-bearing.
 const STORE_DIR = `${homedir()}/.cache/sandcastle-pnpm-store`;
 
-const REPO_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const HOST_NPMRC = `${REPO_ROOT}.npmrc`;
 const CLAUDE_SETTINGS = `${REPO_ROOT}.claude/settings.json`;
 

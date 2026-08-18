@@ -4,7 +4,7 @@ An autonomous coding agent for this repo, running in a Docker container.
 [Sandcastle](https://github.com/mattpocock/sandcastle) provides the sandbox; everything in
 this directory is the wiring around it.
 
-`main.mts` is the watcher: a long-running host process that turns
+`src/main.mts` is the watcher: a long-running host process that turns
 `Sandcastle`-labelled GitHub issues into pull requests, one at a time, and stops for review
 after each one. It never merges.
 
@@ -37,6 +37,10 @@ PHASE 3 · container: RESUMES the planning session, implements, runs the gate, c
    ↓  it commits; it cannot push (SSH remote, no key in the container)
 host: git push, gh pr ready, comment with the commits and how to test it locally
    ↓
+PHASE 4 · container: a FRESH session — no memory of the plan or the code — reviews the diff
+   ↓  complexity, this repo's standards, and each part against the skill it should have used
+host: comment with the findings and a verdict   ← it reviews, it never fixes
+   ↓  ⚠ SWITCHED OFF right now — an issue is done after phase 3. See below
 PAUSE until that pull request is merged or closed
    ↓
 next issue
@@ -47,20 +51,52 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 
 ## Files
 
+```
+.sandcastle/
+├── src/          the watcher: TypeScript the host runs
+├── prompts/      what the agent is told, one file per phase
+├── docs/adr/     why it behaves the way it does
+├── Dockerfile    the image every run starts from
+├── .env          secrets, gitignored — see below
+└── logs/ worktrees/ state/    per-run output, gitignored
+```
+
+Two things live in `.sandcastle` and only two: **code that runs on your machine** (`src/`) and
+**prose the agent reads** (`prompts/`). If you are changing what the agent *does*, you are in
+`prompts/`; if you are changing what happens *around* it, you are in `src/`.
+
+### `src/` — read it in this order
+
 | File | |
 |---|---|
-| `main.mts` | the watcher — poll, dispatch all three phases, push, open PR, notify, pause |
-| `plan-issue.md` | phase 1's prompt: read the issue, run `kickoff`, return a plan, change nothing |
-| `revise-plan.md` | phase 2's prompt when you ask for changes instead of approving |
-| `implement-plan.md` | phase 3's prompt: build the approved plan, and say how to test it by hand |
-| `smoke.mts` + `smoke-test.md` | eleven checks proving the sandbox works at all |
-| `sandbox.mts` | store mount, `.npmrc` injection, plugin install and startup commands, shared by both entry points |
-| `slack.mts` | `chat.postMessage` over a bot token |
-| `Dockerfile` | node 22 + pnpm + gh + jq + Claude Code |
-| `.env` | secrets, gitignored — see below |
-| `docs/adr/` | decisions about how the factory behaves, scoped to this directory rather than to the host repo |
-| `logs/`, `worktrees/` | per-run output, gitignored |
-| `state/` | one JSON file per issue waiting for plan approval, gitignored |
+| `main.mts` | the entry point: the banner, the orphan check, and the poll loop. Nothing else |
+| `workflow.mts` | the state machine — what to do with a new issue, and with your answer to a plan |
+| `phases.mts` | the four agent runs, and how a container is configured for them |
+| `github.mts` | issues, labels, comments, and the draft pull request that carries the plan |
+| `notify.mts` | every Slack message, in the order a run sends them |
+| `state.mts` | `state/issue-<n>.json` — what survives a restart during review |
+| `config.mts` | every knob, every path, every marker. Start here |
+| `types.mts` | the shapes that travel between the modules, `Pending` above all |
+| `shell.mts` | `git`, `gh`, and the timestamped log line |
+| `shutdown.mts` | Ctrl-C, and the sleep that returns early for it |
+| `sandbox.mts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test |
+| `slack.mts` | the transport: `chat.postMessage` over a bot token |
+| `smoke.mts` | the health check — `pnpm sandcastle:smoke` |
+
+### `prompts/` — one per run
+
+| File | |
+|---|---|
+| `plan-issue.md` | phase 1: read the issue, run `kickoff`, return a plan, change nothing |
+| `revise-plan.md` | phase 2, when you ask for changes instead of approving |
+| `implement-plan.md` | phase 3: build the approved plan, and say how to test it by hand |
+| `code-review.md` | phase 4: read the pushed diff and report on it, in a session that did not write it. Switched off — see below |
+| `smoke-test.md` | eleven checks proving the sandbox works at all |
+
+A prompt is loaded from disk on every run, so editing one changes the next run with no restart.
+`{{PLACEHOLDER}}` values are filled in by `phases.mts`; a placeholder with no matching
+`promptArgs` key reaches the agent as literal text, which is the usual cause of a run that
+ignores something you thought you told it.
 
 ## Setup
 
@@ -102,6 +138,7 @@ step* — the point is never having to hunt for the right tab:
 | 🏰 Plan approved — implementing now | your approval comment, the plan, the log |
 | ⏳ heartbeat, at most one every 2 min | — (one line of what the agent is doing) |
 | 🏰 Done — ready for your review | files changed, the comment telling you how to test it, the log |
+| ✅ / 🔍 / ⚠️ Code review: clean / nits / concerns | the review comment, files changed, the log — *off right now* |
 | ✅ Merged / 🚫 Closed | the pull request and the issue |
 
 The unhappy paths post too — planning failed, blocked at planning, abandoned, and the
@@ -128,7 +165,8 @@ Environment variables, all optional:
 |---|---|---|
 | `SANDCASTLE_BASE` | `origin/main` | what branches are cut from, and what PRs target |
 | `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub, and how often to re-check a parked PR |
-| `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` |
+| `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
+| `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL` | — | override `.env` |
 
 ## Outcomes
@@ -152,6 +190,41 @@ file is deleted, so the watcher moves on rather than re-reading an approval it a
 Starting over means re-adding the **`Sandcastle`** label, which plans from scratch — an approved
 plan is not retried on its own, because whatever broke the first attempt is still there.
 
+### Phase 4 is switched off
+
+An issue is currently **done after phase 3**: the pull request is pushed, ready, and reviewed by
+nobody but you. The reviewer is written and wired — `prompts/code-review.md`, `reviewCode` in
+`phases.mts`, `codeReview` in `workflow.mts`, the Slack wording in `notify.mts` — but its single
+call site is commented out.
+
+That is deliberate for the first runs. What those are for is watching plan → approve →
+implement work end to end, and a reviewer posting its own comment in the middle of that is one
+more thing to read while you are still deciding whether the part you care about worked. It also
+doubles the container time per issue before anyone has seen the first pull request.
+
+**To turn it on, uncomment two lines:**
+
+| | |
+|---|---|
+| `src/workflow.mts` | `await codeReview(pending);` in `implement`, under the `phase 4, switched off for now` banner |
+| `src/notify.mts` | in `announceAttempt`, swap the last line back to the one that says a review is running |
+
+Both are commented in place with that instruction, so neither is findable only from here.
+
+**Phase 4**, once on, only happens after `shipped`, and ends in one of four ways, three of which
+are a comment on the pull request:
+
+| | |
+|---|---|
+| `CLEAN` | Nothing to change. |
+| `NITS` | Worth reading before you merge; nothing blocking. |
+| `CONCERNS` | At least one finding a human should decide on before merging. |
+| no review | The run failed, timed out, or came back without a `<review>` block. Said out loud in Slack rather than swallowed — silence would be indistinguishable from `CLEAN`. |
+
+None of them change what happens next. The pull request is already pushed and ready, the
+watcher parks on it either way, and the findings are yours to act on or ignore. A verdict is not
+a gate, and nothing here reopens the branch to fix itself.
+
 **How you review a plan.** Comment on the pull request. `approve`, `approved`, `lgtm`,
 `ship it`, `go ahead`, `looks good` or 👍 at the start of the comment means build it. `abandon`,
 `reject`, `cancel` or `stop` means give up. **Anything else is a change request** — the agent
@@ -171,7 +244,7 @@ path when the run ends; issue comments quote it too.
 again to kill it. Backgrounded, send the signal to `tsx`, not to `pnpm`:
 
 ```sh
-node_modules/.bin/tsx .sandcastle/main.mts > watcher.log 2>&1 &
+node_modules/.bin/tsx .sandcastle/src/main.mts > watcher.log 2>&1 &
 kill -INT %1
 ```
 
@@ -213,6 +286,31 @@ fast path; the session id is mirrored into the pull request description; and the
 different machine, phase 3 still runs — the plan is passed in the prompt either way and the
 agent re-reads the code. Resume is an optimisation, not a dependency.
 
+**The reviewer must not be the author.** Phase 4 is the one run in the sequence that does *not*
+resume anything. Phase 3 resumes phase 1 because continuity is what makes the implementation
+faithful to the plan; phase 4 refuses it for exactly the same reason — an agent handed its own
+session agrees with itself, and a review that always approves is worse than no review, because
+it looks like one. So the reviewer gets the diff, the approved plan and the repo's skills, and
+nothing else. It reads the code the way you would: cold.
+
+It runs on `sonnet` rather than `opus`, and that is not only about cost. Reviewing is a bounded
+reading task against a diff that already compiles, and the judgement it needs is in the skills
+rather than in the model. A review that costs a fraction of the implementation is a review
+nobody is tempted to switch off.
+
+**The review runs after the push, and changes nothing.** It would be tempting to put phase 4
+between the commits and the remote and let it block a bad diff. That trade is bad twice over:
+every timeout, crash or malformed tag in the reviewer would turn finished work into a lost pull
+request, and a verdict nobody can override is a gate an agent controls. So the branch is pushed
+and the pull request is ready *before* the reviewer starts, the findings land as a comment, and
+what to do about them is yours. There is no fix loop — a phase 5 that acts on the findings would
+re-open a branch you have already been told is ready, which is the one thing this design has
+avoided everywhere else.
+
+Because none of it is load-bearing, every failure in phase 4 is best-effort and *loud*: the
+review says in Slack that it did not happen. Silence would be indistinguishable from a clean
+review, which is the single wrong impression this phase must never leave.
+
 **One PR at a time.** Branches are cut from `origin/main` when the issue is dispatched.
 Without the pause, a queue of issues becomes a stack of pull requests all forked from the
 same commit, conflicting with each other. Waiting means the next branch starts from a main
@@ -221,7 +319,7 @@ call every poll.
 
 **The host carries `.npmrc` in.** It is gitignored, and a worktree is a checkout of committed
 history, so the container would otherwise install without the `@finstreet` auth line and fail
-on a 401 minutes in. `sandbox.mts` reads the host's copy and a startup command writes it into
+on a 401 minutes in. `src/sandbox.mts` reads the host's copy and a startup command writes it into
 the worktree. The file holds no secret — only a `${NPM_AUTH_TOKEN}` reference, expanded inside
 the container from `.sandcastle/.env`.
 
@@ -229,12 +327,12 @@ the container from `.sandcastle/.env`.
 worktree already declares which plugins this repo wants — but declaring is not installing.
 A fresh container has no `~/.claude/plugins` at all and nothing populates it: a `claude --print`
 session runs to completion with zero skills and zero MCP servers, which reads as an agent that
-ignored its tools rather than as missing setup. So `sandbox.mts` derives the work from that same
+ignored its tools rather than as missing setup. So `src/sandbox.mts` derives the work from that same
 file — fetch each marketplace's catalog, then `claude plugin install … -s user`. Installing at
 user scope keeps the container's own `enabledPlugins` out of the tracked settings the agent
 might commit. It costs about 10 seconds and 14MB per run, and adding a plugin to
 `.claude/settings.json` is the only edit needed to get it into the sandbox. `playwright` is the
-one exception, skipped by name in `sandbox.mts`: its MCP server connects and then fails on first
+one exception, skipped by name in `src/sandbox.mts`: its MCP server connects and then fails on first
 use, because the image has no browsers.
 
 **Startup commands run in parallel, so ordering lives inside them.** Sandcastle executes
@@ -289,3 +387,6 @@ read it.
 | `no commits between main and sandcastle/issue-n` | The empty plan commit was not created, so `gh pr create` had no diff. Look for a `git commit-tree`/`update-ref` failure earlier in the log. |
 | Agent immediately reports `blocked` | Read the log. Almost always an issue too vague to implement — add detail and re-label. |
 | A run seems stuck | 15 minutes of total silence ends it. Watch progress with `tail -f .sandcastle/logs/<branch>-*.log`. |
+| Slack says *No code review* | The phase-4 run failed or came back without a `<review>` block. The implementation is unaffected — it is pushed and ready. The reason is in the same branch log, after the implementation's. |
+| The review says the reviewer left commits | It committed despite being told not to. Those commits are local and never pushed, so the pull request is unaffected: `git reset --hard origin/sandcastle/issue-<n>` clears them. |
+| The code review repeats the plan back at you | It read `{{PLAN}}` and not the diff. Check the log for the `git diff` calls; if the branch had no commits to read, the implementation is the thing to look at. |
