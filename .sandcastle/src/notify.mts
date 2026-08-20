@@ -186,10 +186,7 @@ export const announceAttempt = (tracked: Tracked, attempt: Attempt, posted: stri
           // Said out loud rather than left in the pull request comment: a failure
           // that saved an hour of work is a different thing to wake up to than one
           // that lost it, and this line is the one people actually read.
-          attempt.rescued
-            ? `:floppy_disk: ${attempt.rescued} uncommitted file(s) were rescued onto \`${tracked.branch}\` ` +
-              `as a \`wip\` commit — host only, never pushed, never gated.`
-            : undefined,
+          rescueLine(attempt, tracked.branch),
           links(maybeLink(posted, "What it reported"), `log \`${attempt.logRef}\``),
         ),
     tracked.threadTs,
@@ -244,6 +241,21 @@ export const announceCodeReviewSkipped = (tracked: Tracked, why: string) =>
     tracked.threadTs,
   );
 
+/**
+ * What a rescued worktree gets said about it. "Not pushed" rather than "never
+ * pushed", deliberately: the host itself never pushes a `wip` commit, but it sits
+ * on an ordinary branch, so the *next* successful run's push carries it along into
+ * the pull request. A line claiming otherwise would be found out by a `git log` on
+ * the diff a human is reviewing, and the honesty of this wording is the whole point
+ * of it — see docs/adr/0005-a-dead-run-does-not-take-its-work-with-it.md.
+ */
+const rescueLine = (attempt: Attempt, branch: string) =>
+  attempt.rescued
+    ? `:floppy_disk: ${attempt.rescued} uncommitted file(s) were rescued onto \`${branch}\` as a ` +
+      `\`wip\` commit — never gated, and not pushed, though a later run's push would carry it. ` +
+      `\`git reset --hard origin/${branch}\` drops it.`
+    : undefined;
+
 // ------------------------------------------------------- phase 5: follow-up
 
 const roundsLine = (rounds: number) => {
@@ -272,13 +284,25 @@ export const announceFollowUp = (
   tracked: AwaitingRevision,
   attempt: Attempt,
   posted: string | undefined,
-) =>
-  notifySlack(
+) => {
+  const rounds = tracked.revisionRounds + 1;
+
+  // Spending the last round *is* the watcher letting go, so this message has to say
+  // so. Inviting another `revise` here would invite a comment nothing is listening
+  // for any more — the state file and the label are already gone by the time this
+  // posts. See the `spent` branch in workflow.mts.
+  const spent = rounds >= MAX_REVISION_ROUNDS;
+  const whatNext = spent
+    ? "The watcher has stopped tracking this issue — merge the pull request, close it, or carry on with it yourself."
+    : "Comment `revise` to try again.";
+
+  return notifySlack(
     attempt.pullRequest
       ? lines(
           `🏰 *Change made — back to you* · ${prLink(tracked)}`,
           `${attempt.commits} commit(s) on top of what you reviewed, the gate green inside the sandbox. ` +
-            roundsLine(tracked.revisionRounds + 1),
+            roundsLine(rounds) +
+            (spent ? ` ${whatNext}` : ""),
           links(
             maybeLink(`${tracked.prUrl}/files`, "Files changed"),
             maybeLink(posted, "How to check it"),
@@ -287,16 +311,13 @@ export const announceFollowUp = (
         )
       : lines(
           `🏰 ${issueLink(tracked.issue)} — follow-up *${attempt.outcome}*. Nothing was pushed.`,
-          `${prLink(tracked)} is exactly as you reviewed it. ${roundsLine(tracked.revisionRounds + 1)} ` +
-            "Comment `revise` to try again.",
-          attempt.rescued
-            ? `:floppy_disk: ${attempt.rescued} uncommitted file(s) were rescued onto \`${tracked.branch}\` ` +
-              `as a \`wip\` commit — host only, never pushed, never gated.`
-            : undefined,
+          `${prLink(tracked)} is exactly as you reviewed it. ${roundsLine(rounds)} ${whatNext}`,
+          rescueLine(attempt, tracked.branch),
           links(maybeLink(posted, "What it reported"), `log \`${attempt.logRef}\``),
         ),
     tracked.threadTs,
   );
+};
 
 /**
  * The bound from `0006` reached. Said in the channel as well as on the pull

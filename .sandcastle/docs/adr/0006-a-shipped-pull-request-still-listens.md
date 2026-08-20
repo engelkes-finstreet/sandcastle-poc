@@ -97,6 +97,16 @@ advances when the bot answers an unmatched comment and exists only to stop it re
 handed. `revise` is given every non-bot comment newer than `servicedThrough`, including ones already
 replied to.
 
+Both clocks are set from the timestamp GitHub put on the comment that moved them, never from the
+host's clock at the moment a run ended. That distinction is not cosmetic, and the first version of
+this got it wrong: a run takes minutes, and stamping `now()` at the end of one puts the watermark
+*after* every comment written while it was going. Those comments are then older than the clock, so
+they are never replied to and never serviced — the exact silence this ADR exists to remove,
+reintroduced by the mechanism meant to prevent it. Anchoring on the triggering comment's own
+`createdAt` keeps the strictly-newer filter doing what it says, and has the side benefit of
+comparing GitHub's clock only against GitHub's clock, so host skew never decides whether a comment
+is read.
+
 Unmatched comments still get their one reply, and post-ship that reply matters more than it did for
 plans. `0003-there-is-no-revision-run.md` rejected silence because *"a human who writes a change
 request and gets nothing back learns nothing from the silence — they cannot tell it from a watcher

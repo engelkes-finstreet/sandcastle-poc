@@ -276,7 +276,7 @@ export const decide = (tracked: Tracked): Decision => {
   if (!latest) return { type: "wait" };
 
   const { author, body } = said(latest);
-  const reviewed: Reviewed = { comment: body, author, url: latest.url };
+  const reviewed: Reviewed = { comment: body, author, at: latest.createdAt, url: latest.url };
 
   if (tracked.status === "awaiting-plan") {
     if (APPROVES.test(reviewed.comment)) return { type: "approve", ...reviewed };

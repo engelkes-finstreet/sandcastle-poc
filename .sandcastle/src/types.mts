@@ -103,6 +103,15 @@ export type Attempt = {
 export type Reviewed = {
   readonly comment: string;
   readonly author: string;
+  /**
+   * When GitHub says the comment was written, and the only thing a watermark is
+   * ever set from. Advancing a clock to the host's `Date.now()` *after* a run
+   * would swallow every comment made while that run was going — no reply, no
+   * round, no trace — which is the one failure the two clocks exist to prevent.
+   * Comparing GitHub's clock against GitHub's clock also removes the host's skew
+   * from the comparison.
+   */
+  readonly at: string;
   /** Permalink to the comment, so Slack can point at what was actually said. */
   readonly url?: string;
 };

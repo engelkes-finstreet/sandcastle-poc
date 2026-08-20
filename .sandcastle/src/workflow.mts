@@ -191,7 +191,7 @@ const clarify = async (tracked: Tracked, decision: Reviewed): Promise<Serviced> 
           `first and trigger it when you are done. \`abandon\` stops the watcher tracking this ` +
           `pull request and leaves the code where it is.`,
   );
-  saveTracked({ ...tracked, repliedThrough: now() });
+  saveTracked({ ...tracked, repliedThrough: decision.at });
   return "worked";
 };
 
@@ -231,15 +231,17 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
     return "worked";
   }
 
-  // Both clocks start again here. The approval that got us this far is older than
-  // both, which is what stops it being read as a comment on the shipped code.
-  const stamp = now();
+  // Both clocks restart at the approval itself, not at the moment this run
+  // finished. The filter is strictly newer, so the approval is still not re-read —
+  // but anything said *while* the agent was working is, which is the whole point:
+  // "actually, also rename X" typed twenty minutes into an implementation is a
+  // comment on this pull request, and a clock set to `now()` here would bury it.
   const shipped: AwaitingRevision = {
     ...tracked,
     status: "awaiting-revision",
     revisionRounds: 0,
-    servicedThrough: stamp,
-    repliedThrough: stamp,
+    servicedThrough: decision.at,
+    repliedThrough: decision.at,
   };
   saveTracked(shipped);
   relabel(tracked.issue, { add: REVISION_LABEL, remove: AWAITING_LABEL });
@@ -311,18 +313,28 @@ export const codeReview = async (tracked: Tracked) => {
 
 // -------------------------------------------------------- phase 5: follow-up
 
+/**
+ * What the watcher says on the pull request when it runs out of rounds. Said at the
+ * end of the round that reached the bound, not when a further `revise` arrives: the
+ * bound is reached the moment that round is spent, and a watcher that holds a label,
+ * a state file and a `gh pr view` per poll open while having nothing left to offer is
+ * worse than one that says so and lets go.
+ */
+const ROUNDS_SPENT =
+  `🏖️ That is ${MAX_REVISION_ROUNDS} follow-up rounds spent, which is the limit — so the watcher ` +
+  `has stopped tracking this issue and will not act on further comments here.\n\n` +
+  `Nothing has been changed or lost: the code is exactly as the last round left it. Merge it, ` +
+  `close it, or carry on with it yourself. If what is left is a separate piece of work, it is ` +
+  `worth its own issue with the **${LABEL}** label rather than a fourth round on this one.`;
+
 /** `revise` on a shipped pull request: spend a round on what was asked for. */
 const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promise<Serviced> => {
+  // Defensive only. A round is spent the moment it ends and the watcher lets go of
+  // the issue there, so nothing should arrive here already at the bound — but a state
+  // file written before that was true, or one whose `forget` half-failed, would.
   if (tracked.revisionRounds >= MAX_REVISION_ROUNDS) {
     log(`  #${tracked.issue.number} has spent all ${MAX_REVISION_ROUNDS} follow-up rounds — letting go`);
-    const posted = commentOnPr(
-      tracked.prNumber,
-      `🏖️ That is ${MAX_REVISION_ROUNDS} follow-up rounds spent, which is the limit — so the watcher ` +
-        `has stopped tracking this issue and will not act on further comments here.\n\n` +
-        `Nothing has been changed or lost: the code is exactly as the last round left it. Merge it, ` +
-        `close it, or carry on with it yourself. If what is left is a separate piece of work, it is ` +
-        `worth its own issue with the **${LABEL}** label rather than a fourth round on this one.`,
-    );
+    const posted = commentOnPr(tracked.prNumber, ROUNDS_SPENT);
     forget(tracked);
     await announceRoundsSpent(tracked, posted);
     return "worked";
@@ -345,24 +357,39 @@ const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promis
   }
 
   log(`  #${tracked.issue.number} → follow-up ${attempt.outcome}`);
-  const posted = commentOnPr(tracked.prNumber, attempt.comment);
 
   // The round is spent either way — a failed follow-up must not be free, or a
-  // pull request could never run out of them.
+  // pull request could never run out of them — and spending the last one is the
+  // second of only two ways an issue's life ends, so it is said in the same comment
+  // that reports the round rather than waiting for somebody to ask again.
+  const rounds = tracked.revisionRounds + 1;
+  const spent = rounds >= MAX_REVISION_ROUNDS;
+  const posted = commentOnPr(
+    tracked.prNumber,
+    spent ? `${attempt.comment}\n\n---\n\n${ROUNDS_SPENT}` : attempt.comment,
+  );
+
+  // The two clocks part company here, and neither is set from the host's clock:
+  // both move to the *request's* timestamp, so a comment written while the container
+  // was running is still newer than them and gets read on the next poll.
   //
-  // The two clocks part company here. `repliedThrough` always moves, or the same
-  // `revise` would be the newest unanswered comment on the next poll and fire
-  // again forever. `servicedThrough` moves only when the run actually acted on
-  // what was said: a blocked or dead run acted on nothing, so those comments stay
-  // in the payload of the next `revise` rather than having to be typed again.
+  // `repliedThrough` always moves, or the same `revise` would be the newest
+  // unanswered comment on the next poll and fire again forever. `servicedThrough`
+  // moves only when the run actually acted on what was said: a blocked or dead run
+  // acted on nothing, so those comments stay in the payload of the next `revise`
+  // rather than having to be typed again.
   const acted = attempt.outcome === "shipped" || attempt.outcome === "no-changes";
-  const stamp = now();
-  saveTracked({
+  const after: AwaitingRevision = {
     ...tracked,
-    revisionRounds: tracked.revisionRounds + 1,
-    repliedThrough: stamp,
-    servicedThrough: acted ? stamp : tracked.servicedThrough,
-  });
+    revisionRounds: rounds,
+    repliedThrough: request.at,
+    servicedThrough: acted ? request.at : tracked.servicedThrough,
+  };
+
+  // On the spent path the clocks above are moot — there is no next run to hand
+  // anything to, and the state file goes with the label.
+  if (spent) forget(after);
+  else saveTracked(after);
 
   const post = await announceFollowUp(tracked, attempt, posted);
   if (post.error) log(`  WARNING: Slack notification failed: ${post.error}`);

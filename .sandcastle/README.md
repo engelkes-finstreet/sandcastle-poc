@@ -247,8 +247,14 @@ What survives is the *files*, never the session — Claude Code ran inside the c
 JSONL died with it. A `wip` commit is unverified by construction: the gate runs before the
 agent's own commit, so anything the host rescues never reached it. Treat it as a starting point
 for the next attempt, which is exactly how `prompts/implement-plan.md` tells the next agent to
-treat it. It is never pushed, so a `wip` commit sits on your host until a retry supersedes it or
-you delete the branch. `git log sandcastle/issue-<n>` finds it; `git show` reads it.
+treat it. `git log sandcastle/issue-<n>` finds it; `git show` reads it.
+
+**The host never pushes it — but that is not the same as it never being pushed.** A `wip` commit
+sits on an ordinary branch, so the next run that succeeds on that branch pushes it along with
+its own work, and it turns up in the diff on the pull request. The comment and the Slack line say
+so, because a `git log` on a pull request under review would find it out either way. If you would
+rather it never appeared, `git reset --hard origin/sandcastle/issue-<n>` on the host before the
+next round.
 
 ### Phase 4 is switched off
 
@@ -316,6 +322,11 @@ That is why there are two clocks, not one. The *replied* clock stops the one-rep
 repeating itself; the *serviced* clock decides what a run is handed. A reply must never consume a
 comment, or `revise` would fire with an empty payload — see
 `docs/adr/0006-a-shipped-pull-request-still-listens.md`.
+
+Both are set from the timestamp GitHub gives the comment that moved them, never from the host's
+clock when a run finished. So a comment you write *while* a container is running is still newer
+than either clock when the run ends: it gets read on the next poll, and answered or acted on like
+any other. Setting them to "now" would have swallowed it — no reply, no round, no trace.
 
 **A comment on a specific line of the diff triggers nothing.** Inline review comments and
 GitHub review submissions are not in the payload `gh pr view --json comments` returns, so the
@@ -494,8 +505,8 @@ read it.
 | `no commits between main and sandcastle/issue-n` | The empty plan commit was not created, so `gh pr create` had no diff. Look for a `git commit-tree`/`update-ref` failure earlier in the log. |
 | Agent immediately reports `blocked` | Read the log. Almost always an issue too vague to implement — add detail and re-label. |
 | A run seems stuck | 15 minutes of total silence ends it. Watch progress with `tail -f .sandcastle/logs/<branch>-*.log`. |
-| A run died mid-implementation (timeout, dropped connection, Ctrl-C) | Its uncommitted files are on the branch as a `wip(#n)` commit — `git log sandcastle/issue-<n>`. Host only, never pushed, never gated. Re-add the **Sandcastle** label and the next attempt starts from it. |
-| A `wip(#n)` commit you do not want | `git reset --hard origin/sandcastle/issue-<n>` on the host, or delete the branch. Nothing pushed it, so the pull request never saw it. |
+| A run died mid-implementation (timeout, dropped connection, Ctrl-C) | Its uncommitted files are on the branch as a `wip(#n)` commit — `git log sandcastle/issue-<n>`. Never gated, and the host does not push it. Re-add the **Sandcastle** label and the next attempt starts from it. |
+| A `wip(#n)` commit you do not want | `git reset --hard origin/sandcastle/issue-<n>` on the host, or delete the branch. Do it before the next round on that branch: the host never pushes a `wip` commit, but the next successful run's push carries it into the pull request. |
 | Slack says *No code review* | The phase-4 run failed or came back without a `<review>` block. The implementation is unaffected — it is pushed and ready. The reason is in the same branch log, after the implementation's. |
 | The review says the reviewer left commits | It committed despite being told not to. Those commits are local and never pushed, so the pull request is unaffected: `git reset --hard origin/sandcastle/issue-<n>` clears them. |
 | The code review repeats the plan back at you | It read `{{PLAN}}` and not the diff. Check the log for the `git diff` calls; if the branch had no commits to read, the implementation is the thing to look at. |

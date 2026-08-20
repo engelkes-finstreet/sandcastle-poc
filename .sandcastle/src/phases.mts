@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { Output, claudeCode, run } from "@ai-hero/sandcastle";
 import {
   BASE_BRANCH,
@@ -119,7 +119,13 @@ const managedWorktrees = (): HostWorktree[] =>
       path: /^worktree (.+)$/m.exec(block)?.[1],
       branch: /^branch refs\/heads\/(.+)$/m.exec(block)?.[1],
     }))
-    .filter((wt): wt is HostWorktree => !!wt.path && !!wt.branch && wt.path.startsWith(WORKTREES));
+    // `WORKTREES + sep`, not `WORKTREES`: a bare prefix would also claim a sibling
+    // directory whose name merely starts the same way, and this list decides what
+    // gets committed to somebody's branch.
+    .filter(
+      (wt): wt is HostWorktree =>
+        !!wt.path && !!wt.branch && wt.path.startsWith(WORKTREES + sep),
+    );
 
 /**
  * Commit whatever a run left uncommitted in one worktree, as a single `wip` commit
@@ -297,8 +303,11 @@ const leftoversNote = (rescued: number, branch: string) =>
   rescued === 0
     ? ""
     : `\n\nThe ${rescued} file(s) it had written but not committed are now on \`${branch}\` as a ` +
-      `\`wip\` commit — on the host only, never pushed, and none of it passed the gate. ` +
-      `\`git log ${branch}\` to see it; a retry starts from it rather than from nothing.`;
+      `\`wip\` commit, and none of it passed the gate. \`git log ${branch}\` to see it; a retry ` +
+      `starts from it rather than from nothing.\n\nThe host does not push it — but it is an ` +
+      `ordinary commit on this branch, so the next run that *does* push will carry it into this ` +
+      `pull request. \`git reset --hard origin/${branch}\` on the host drops it if you would ` +
+      `rather it never appeared here.`;
 
 /** What both code-writing phases know about their own run, before it is judged. */
 type Ran = { readonly branch: string; readonly logRef: string; readonly commits: number };
