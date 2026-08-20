@@ -97,6 +97,14 @@ msgstr "{absentee} wird zur Zeit vertreten durch {substitute}."
 msgid "5vyb3y"
 msgstr "Benutzerverwaltung"
 
+#: src/app/admin/feedback/page.tsx:28
+msgid "Ejhdi4"
+msgstr "Feedback"
+
+#: src/app/admin/feedback/page.tsx:35
+msgid "e/5Lmo"
+msgstr "Ihr Feedback wird intern ausgewertet und hilft uns, die Anwendung zu verbessern. Bitte geben Sie hier keine personenbezogenen Daten von Kunden ein."
+
 #: src/app/kunde/factoring-antraege/[financingCaseId]/anfrage-details/page.tsx:17
 #: src/features/financingCaseOverview/customer/taskGroups/verifyInquiry/CustomerVerifyInquiryTaskPanel/index.tsx:28
 msgid "VSzEdb"
@@ -134,6 +142,7 @@ msgstr "Finanzierungsfall erfolgreich anonymisiert"
 #: src/features/anonymizeFinancingCase/fsp/forms/anonymizeFinancingCaseForm/anonymizeFinancingCaseFormConfig.tsx:63
 #: src/features/archiveFinancingCase/fsp/forms/archiveFinancingCaseForm/archiveFinancingCaseFormConfig.tsx:69
 #: src/features/assignCaseManager/fsp/forms/assignCaseManagerForm/useAssignCaseManagerFormConfig.tsx:59
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:107
 #: src/features/financingCaseOverview/fsp/forms/updateInternalRemarksForm/updateInternalRemarkFormConfig.tsx:60
 #: src/features/legalRepresentatives/forms/create/useCreateLegalRepresentativeFormConfig.tsx:72
 #: src/features/legalRepresentatives/forms/update/useUpdateLegalRepresentativeFormConfig.tsx:70
@@ -331,6 +340,80 @@ msgstr "Hochgeladene Dokumente"
 #: src/features/documentExchange/common/components/DocumentExchangeRequestGroup.tsx:52
 msgid "ai/FrN"
 msgstr "({uploadedRequiredAmount, number} von {totalRequiredAmount, number} Pflichtdokumente eingereicht)"
+
+#: src/features/feedback/fsp/components/FeedbackContent.tsx:19
+msgid "BlL4vX"
+msgstr "Vielen Dank! Ihr Feedback wurde übermittelt und wird intern ausgewertet."
+
+#: src/features/feedback/fsp/components/FeedbackContent.tsx:24
+msgid "dK69Br"
+msgstr "Weiteres Feedback schreiben"
+
+#: src/features/feedback/fsp/forms/submitFeedback/options/useFeedbackCategoryOptions.ts:11
+msgid "CtGJZ3"
+msgstr "Fehler"
+
+#: src/features/feedback/fsp/forms/submitFeedback/options/useFeedbackCategoryOptions.ts:12
+msgid "s2H+zc"
+msgstr "Verbesserung"
+
+#: src/features/feedback/fsp/forms/submitFeedback/options/useFeedbackCategoryOptions.ts:13
+msgid "iwL9SY"
+msgstr "Sonstiges"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:16
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:86
+msgid "TtqCeP"
+msgstr "Betreff"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:17
+msgid "3bGhKK"
+msgstr "Maximal 80 Zeichen"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:21
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:90
+msgid "rYyDSs"
+msgstr "Kategorie"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:22
+msgid "gwLOuz"
+msgstr "Kategorie auswählen"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:27
+msgid "OFlXRt"
+msgstr "Nachricht"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:28
+msgid "hIZZ+U"
+msgstr "Mindestens 20, maximal 1000 Zeichen"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:32
+msgid "t2uEcq"
+msgstr "Rückmeldung erwünscht"
+
+#: src/features/feedback/fsp/forms/submitFeedback/useSubmitFeedbackFormFields.ts:33
+msgid "y0Ozv6"
+msgstr "Wir melden uns per E-Mail bei Ihnen, sobald wir Ihr Feedback bearbeitet haben."
+
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:75
+msgid "/QEn8K"
+msgstr "Feedback absenden?"
+
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:77
+msgid "gSVcMQ"
+msgstr "Bitte prüfen Sie Ihre Angaben. Nach dem Absenden können Sie das Feedback nicht mehr ändern."
+
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:95
+msgid "IoQr7E"
+msgstr "Beim Absenden des Feedbacks ist ein Fehler aufgetreten."
+
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/ConfirmFeedbackModal.tsx:110
+msgid "XoNxTi"
+msgstr "Absenden"
+
+#: src/features/feedback/fsp/modals/ConfirmFeedbackModal/OpenConfirmFeedbackModalButton.tsx:26
+msgid "jzjyhm"
+msgstr "Feedback absenden"
 
 #: src/features/financingCaseOverview/customer/CustomerFinancingCaseOverviewPageHeader.tsx:43
 #: src/features/financingCaseOverview/customer/CustomerFinancingCaseOverviewSubPageHeader.tsx:32
