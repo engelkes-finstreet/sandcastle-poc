@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 export const LABEL = "Sandcastle";
 export const AWAITING_LABEL = "Sandcastle:awaiting-approval";
+export const REVISION_LABEL = "Sandcastle:awaiting-revision";
 
 /** Completion signals the implementation prompt promises to emit. */
 export const COMPLETE = "<promise>COMPLETE</promise>";
@@ -25,7 +26,7 @@ export const VERDICTS = ["CLEAN", "NITS", "CONCERNS"] as const;
  * Stamped into everything the watcher writes on GitHub. The pull request is
  * opened with your `gh` credentials, so the watcher's own comments are
  * indistinguishable from yours by author — without this marker it would read its
- * own "🏰 implementing now" as a change request and re-plan forever.
+ * own "🏰 implementing now" as a review comment and answer itself forever.
  */
 export const BOT_MARKER = "<!-- sandcastle -->";
 
@@ -33,8 +34,21 @@ export const BOT_MARKER = "<!-- sandcastle -->";
 export const APPROVES = /^\s*(approved?|lgtm|ship\s*it|go\s*ahead|looks good|👍|:\+1:)/i;
 export const ABANDONS = /^\s*(abandon|reject|cancel|stop|nevermind|never mind)\b/i;
 
-/** At most one progress heartbeat per issue thread this often. */
-export const PROGRESS_SECONDS = 120;
+/**
+ * `revise` and friends spend a follow-up round on a pull request that has already
+ * shipped. Deliberately a trigger word rather than "any comment": a colleague
+ * asking *why this way?* on a shipped pull request should not cost a container.
+ * See docs/adr/0006-a-shipped-pull-request-still-listens.md.
+ */
+export const REVISES = /^\s*(revise|rework|changes?\s*requested)\b/i;
+
+/**
+ * Follow-up runs one pull request may spend. A badly specified issue would
+ * otherwise burn containers until somebody noticed; at the bound the watcher says
+ * so and lets go. Blocked and no-signal endings count — a failed follow-up must
+ * not be free — but a comment that triggered nothing does not.
+ */
+export const MAX_REVISION_ROUNDS = 3;
 
 /** Total agent silence tolerated before sandcastle kills a run. `pnpm build` alone is a quiet minute. */
 export const IDLE_TIMEOUT_SECONDS = 900;
@@ -77,8 +91,8 @@ export const SANDCASTLE = join(REPO_ROOT, ".sandcastle");
 const prompt = (name: string) => join(SANDCASTLE, "prompts", name);
 
 export const PLAN_PROMPT = prompt("plan-issue.md");
-export const REVISE_PROMPT = prompt("revise-plan.md");
 export const IMPLEMENT_PROMPT = prompt("implement-plan.md");
+export const FOLLOW_UP_PROMPT = prompt("follow-up.md");
 export const CODE_REVIEW_PROMPT = prompt("code-review.md");
 
 export const WORKTREES = join(SANDCASTLE, "worktrees");

@@ -1,8 +1,7 @@
-import type { AgentStreamEvent } from "@ai-hero/sandcastle";
 import {
   BASE_BRANCH,
   LABEL,
-  PROGRESS_SECONDS,
+  MAX_REVISION_ROUNDS,
   PR_BASE,
   REVIEW_MODEL,
   branchFor,
@@ -10,7 +9,16 @@ import {
 } from "./config.mts";
 import { REPO } from "./github.mts";
 import { notifySlack, type SlackPost } from "./slack.mts";
-import type { Attempt, CodeReview, Issue, Pending, Reviewed, Verdict } from "./types.mts";
+import type {
+  Attempt,
+  AwaitingRevision,
+  ChangeRequest,
+  CodeReview,
+  Issue,
+  Reviewed,
+  Tracked,
+  Verdict,
+} from "./types.mts";
 
 export { slackStatus } from "./slack.mts";
 
@@ -33,8 +41,8 @@ const escapeSlack = (text: string) =>
 const issueLink = (issue: Issue) =>
   `<https://github.com/${REPO}/issues/${issue.number}|#${issue.number} ${escapeSlack(issue.title)}>`;
 
-const prLink = (pending: Pick<Pending, "prUrl" | "prNumber">) =>
-  `<${pending.prUrl}|PR #${pending.prNumber}>`;
+const prLink = (tracked: Pick<Tracked, "prUrl" | "prNumber">) =>
+  `<${tracked.prUrl}|PR #${tracked.prNumber}>`;
 
 /** A link, or nothing when the URL is missing — `gh` failures must not print `<undefined|…>`. */
 const maybeLink = (url: string | undefined, text: string) => (url ? `<${url}|${text}>` : undefined);
@@ -108,7 +116,7 @@ export const announcePlanPosted = (
     lines(
       `🏰 *Plan posted, waiting for you* — <${pr.url}|PR #${pr.number}>`,
       `Plans ${issueLink(issue)}. Nothing is implemented yet; the branch holds one empty commit.`,
-      "Comment `approve` on the pull request to build it, or comment feedback to have it re-plan.",
+      "Comment `approve` on the pull request to build it — notes in that same comment override the plan.",
       links(
         maybeLink(pr.url, "Read the plan"),
         maybeLink(`${pr.url}#issuecomment-new`, "Reply to it"),
@@ -120,82 +128,71 @@ export const announcePlanPosted = (
 
 // ---------------------------------------------------------- phase 2: review
 
-export const announcePlanGone = (pending: Pending, state: string) =>
+export const announcePlanGone = (tracked: Tracked, state: string) =>
   notifySlack(
     lines(
-      `🏰 ${issueLink(pending.issue)} — ${prLink(pending)} was ${state.toLowerCase()} before the plan was approved.`,
+      `🏰 ${issueLink(tracked.issue)} — ${prLink(tracked)} was ${state.toLowerCase()} before the plan was approved.`,
       `Dropped it. Re-add the **${LABEL}** label to plan it again.`,
     ),
-    pending.threadTs,
+    tracked.threadTs,
   );
 
-export const announceAbandoned = (pending: Pending, decision: Reviewed) =>
+export const announceAbandoned = (tracked: Tracked, decision: Reviewed) =>
   notifySlack(
     lines(
-      `🏰 ${issueLink(pending.issue)} — *abandoned* by ${decision.author}. Nothing was implemented.`,
-      `${prLink(pending)} and its branch are left for you to delete.`,
-      links(maybeLink(decision.url, "The comment"), maybeLink(pending.prUrl, "Pull request")),
+      `🏰 ${issueLink(tracked.issue)} — *abandoned* by ${decision.author}. Nothing was implemented.`,
+      `${prLink(tracked)} and its branch are left for you to delete.`,
+      links(maybeLink(decision.url, "The comment"), maybeLink(tracked.prUrl, "Pull request")),
     ),
-    pending.threadTs,
-  );
-
-export const announcePlanRevised = (
-  revised: Pending,
-  decision: Reviewed,
-  posted: string | undefined,
-) =>
-  notifySlack(
-    lines(
-      `🏰 *Plan revised* after ${decision.author}'s feedback — ${prLink(revised)}`,
-      `Still ${issueLink(revised.issue)}, still nothing implemented. Comment \`approve\` to build it.`,
-      links(
-        maybeLink(revised.prUrl, "New plan"),
-        maybeLink(decision.url, "The feedback"),
-        maybeLink(posted, "Revision notice"),
-        logHint(revised.branch),
-      ),
-    ),
-    revised.threadTs,
+    tracked.threadTs,
   );
 
 // ------------------------------------------------------- phase 3: implement
 
-export const announceApproved = (pending: Pending, decision: Reviewed) =>
+export const announceApproved = (tracked: Tracked, decision: Reviewed) =>
   notifySlack(
     lines(
-      `🏰 *Plan approved by ${decision.author} — implementing now* · ${prLink(pending)}`,
-      `Building the approved plan for ${issueLink(pending.issue)} on \`${pending.branch}\`, resuming the session it planned in.`,
+      `🏰 *Plan approved by ${decision.author} — implementing now* · ${prLink(tracked)}`,
+      `Building the approved plan for ${issueLink(tracked.issue)} on \`${tracked.branch}\`, in a fresh session.`,
       links(
         maybeLink(decision.url, "The approval"),
-        maybeLink(pending.prUrl, "The plan"),
-        logHint(pending.branch),
+        maybeLink(tracked.prUrl, "The plan"),
+        logHint(tracked.branch),
       ),
     ),
-    pending.threadTs,
+    tracked.threadTs,
   );
 
-export const announceAttempt = (pending: Pending, attempt: Attempt, posted: string | undefined) =>
+export const announceAttempt = (tracked: Tracked, attempt: Attempt, posted: string | undefined) =>
   notifySlack(
     attempt.pullRequest
       ? lines(
-          `🏰 *Done — ready for your review* · ${prLink(pending)}`,
-          `Implements ${issueLink(pending.issue)} with ${attempt.commits} commit(s), the gate green inside the sandbox.`,
+          `🏰 *Done — ready for your review* · ${prLink(tracked)}`,
+          `Implements ${issueLink(tracked.issue)} with ${attempt.commits} commit(s), the gate green inside the sandbox.`,
           // Phase 4 is switched off in workflow.mts, so this must not promise a
-          // review nobody is running. With it on, the line becomes:
-          //   "A code review is running now and lands in this thread. Nothing else runs until you merge or close it.",
-          "Nothing else runs until you merge or close it.",
+          // review nobody is running. With it on, prefix the line below with:
+          //   "A code review is running now and lands in this thread. "
+          "Comment `revise` on the pull request for a change; merge or close it when you are done. " +
+            "Other issues keep moving in the meantime.",
           links(
-            maybeLink(`${pending.prUrl}/files`, "Files changed"),
+            maybeLink(`${tracked.prUrl}/files`, "Files changed"),
             maybeLink(posted, "How to test it locally"),
             `log \`${attempt.logRef}\``,
           ),
         )
       : lines(
-          `🏰 ${issueLink(pending.issue)} — *${attempt.outcome}* after an approved plan. Nothing was pushed.`,
-          `${prLink(pending)} stays a draft. The label is off the issue; re-add it to start over from planning.`,
+          `🏰 ${issueLink(tracked.issue)} — *${attempt.outcome}* after an approved plan. Nothing was pushed.`,
+          `${prLink(tracked)} stays a draft. The label is off the issue; re-add it to start over from planning.`,
+          // Said out loud rather than left in the pull request comment: a failure
+          // that saved an hour of work is a different thing to wake up to than one
+          // that lost it, and this line is the one people actually read.
+          attempt.rescued
+            ? `:floppy_disk: ${attempt.rescued} uncommitted file(s) were rescued onto \`${tracked.branch}\` ` +
+              `as a \`wip\` commit — host only, never pushed, never gated.`
+            : undefined,
           links(maybeLink(posted, "What it reported"), `log \`${attempt.logRef}\``),
         ),
-    pending.threadTs,
+    tracked.threadTs,
   );
 
 // ----------------------------------------------------- phase 4: code review
@@ -212,24 +209,24 @@ const VERDICT_LINE: Record<Verdict, string> = {
 };
 
 export const announceCodeReview = (
-  pending: Pending,
+  tracked: Tracked,
   review: CodeReview,
   posted: string | undefined,
 ) =>
   notifySlack(
     lines(
-      `${VERDICT_LINE[review.verdict]} · ${prLink(pending)}`,
-      `A fresh agent on \`${REVIEW_MODEL}\` read the diff for ${issueLink(pending.issue)} — it did not write this code and cannot see the session that did.`,
+      `${VERDICT_LINE[review.verdict]} · ${prLink(tracked)}`,
+      `A fresh agent on \`${REVIEW_MODEL}\` read the diff for ${issueLink(tracked.issue)} — it did not write this code and cannot see the session that did.`,
       review.strayCommits > 0
-        ? `:warning: It also left ${review.strayCommits} commit(s) on \`${pending.branch}\` despite being read-only. They are local and unpushed; \`git reset --hard origin/${pending.branch}\` clears them.`
+        ? `:warning: It also left ${review.strayCommits} commit(s) on \`${tracked.branch}\` despite being read-only. They are local and unpushed; \`git reset --hard origin/${tracked.branch}\` clears them.`
         : undefined,
       links(
         maybeLink(posted, "The review"),
-        maybeLink(`${pending.prUrl}/files`, "Files changed"),
-        logHint(pending.branch),
+        maybeLink(`${tracked.prUrl}/files`, "Files changed"),
+        logHint(tracked.branch),
       ),
     ),
-    pending.threadTs,
+    tracked.threadTs,
   );
 
 /**
@@ -237,61 +234,92 @@ export const announceCodeReview = (
  * indistinguishable from a clean review, and that is the one wrong impression this
  * phase must never leave.
  */
-export const announceCodeReviewSkipped = (pending: Pending, why: string) =>
+export const announceCodeReviewSkipped = (tracked: Tracked, why: string) =>
   notifySlack(
     lines(
-      `:grey_question: *No code review* on ${prLink(pending)} — ${escapeSlack(why)}`,
+      `:grey_question: *No code review* on ${prLink(tracked)} — ${escapeSlack(why)}`,
       `The implementation is pushed and ready either way; it just has not been read by anything but the agent that wrote it.`,
-      links(maybeLink(`${pending.prUrl}/files`, "Files changed"), logHint(pending.branch)),
+      links(maybeLink(`${tracked.prUrl}/files`, "Files changed"), logHint(tracked.branch)),
     ),
-    pending.threadTs,
+    tracked.threadTs,
   );
 
-/** The last word on an issue: the pull request the watcher was parked on is gone. */
-export const announceReviewFinished = (pending: Pending, state: string) =>
-  notifySlack(
-    state === "MERGED"
-      ? `:white_check_mark: *Merged* — ${prLink(pending)} is in \`${PR_BASE}\`, ${issueLink(pending.issue)} is done. Back to watching for *${LABEL}* issues.`
-      : `:no_entry_sign: *Closed without merging* — ${prLink(pending)}. ${issueLink(pending.issue)} was not implemented. Back to watching for *${LABEL}* issues.`,
-    pending.threadTs,
-  );
+// ------------------------------------------------------- phase 5: follow-up
 
-// ----------------------------------------------------------------- progress
-
-/** One line of agent activity, flattened and clipped to something a thread can hold. */
-const summarise = (event: AgentStreamEvent) => {
-  const raw =
-    event.type === "toolCall"
-      ? `${event.name} ${event.formattedArgs}`
-      : event.type === "text"
-        ? event.message
-        : "";
-  const flat = raw.replace(/\s+/g, " ").trim();
-  return flat.length > 200 ? `${flat.slice(0, 200)}…` : flat;
+const roundsLine = (rounds: number) => {
+  const left = MAX_REVISION_ROUNDS - rounds;
+  return left === 0
+    ? `That was the last of ${MAX_REVISION_ROUNDS} follow-up rounds.`
+    : `${left} follow-up round${left === 1 ? "" : "s"} left of ${MAX_REVISION_ROUNDS}.`;
 };
+
+export const announceRevising = (tracked: AwaitingRevision, request: ChangeRequest) =>
+  notifySlack(
+    lines(
+      `🏰 *Change requested by ${request.author} — working on it* · ${prLink(tracked)}`,
+      `Round ${tracked.revisionRounds + 1} of ${MAX_REVISION_ROUNDS} on \`${tracked.branch}\` for ` +
+        `${issueLink(tracked.issue)}, in a fresh session that reads the diff rather than the plan.`,
+      links(
+        maybeLink(request.url, "The request"),
+        maybeLink(`${tracked.prUrl}/files`, "Files changed"),
+        logHint(tracked.branch),
+      ),
+    ),
+    tracked.threadTs,
+  );
+
+export const announceFollowUp = (
+  tracked: AwaitingRevision,
+  attempt: Attempt,
+  posted: string | undefined,
+) =>
+  notifySlack(
+    attempt.pullRequest
+      ? lines(
+          `🏰 *Change made — back to you* · ${prLink(tracked)}`,
+          `${attempt.commits} commit(s) on top of what you reviewed, the gate green inside the sandbox. ` +
+            roundsLine(tracked.revisionRounds + 1),
+          links(
+            maybeLink(`${tracked.prUrl}/files`, "Files changed"),
+            maybeLink(posted, "How to check it"),
+            `log \`${attempt.logRef}\``,
+          ),
+        )
+      : lines(
+          `🏰 ${issueLink(tracked.issue)} — follow-up *${attempt.outcome}*. Nothing was pushed.`,
+          `${prLink(tracked)} is exactly as you reviewed it. ${roundsLine(tracked.revisionRounds + 1)} ` +
+            "Comment `revise` to try again.",
+          attempt.rescued
+            ? `:floppy_disk: ${attempt.rescued} uncommitted file(s) were rescued onto \`${tracked.branch}\` ` +
+              `as a \`wip\` commit — host only, never pushed, never gated.`
+            : undefined,
+          links(maybeLink(posted, "What it reported"), `log \`${attempt.logRef}\``),
+        ),
+    tracked.threadTs,
+  );
 
 /**
- * Forward what the agent is doing into the issue's thread — as a heartbeat, not
- * a transcript. A post per tool call would be hundreds of messages for one issue
- * and would run into chat.postMessage's one-per-second-per-channel limit, so at
- * most one update lands every PROGRESS_SECONDS and the rest are dropped.
- *
- * Fire-and-forget on purpose: a slow Slack must not stall the agent's stream.
- * notifySlack never throws, and sandcastle swallows anything this callback does.
+ * The bound from `0006` reached. Said in the channel as well as on the pull
+ * request, because it is the one ending where the watcher stops without anything
+ * on GitHub changing state — silence here would read as a watcher that had simply
+ * stopped answering.
  */
-export const progressReporter = (threadTs?: string) => {
-  let lastPostedAt = 0;
+export const announceRoundsSpent = (tracked: AwaitingRevision, posted: string | undefined) =>
+  notifySlack(
+    lines(
+      `:hand: *Out of follow-up rounds* · ${prLink(tracked)}`,
+      `${MAX_REVISION_ROUNDS} follow-ups have been spent on ${issueLink(tracked.issue)}, so the watcher ` +
+        "has stopped tracking it. The pull request is untouched — merge it, close it, or take it from here.",
+      links(maybeLink(posted, "What it said"), maybeLink(`${tracked.prUrl}/files`, "Files changed")),
+    ),
+    tracked.threadTs,
+  );
 
-  return (event: AgentStreamEvent) => {
-    if (!threadTs) return;
-
-    const now = Date.now();
-    if (now - lastPostedAt < PROGRESS_SECONDS * 1000) return;
-
-    const summary = summarise(event);
-    if (!summary) return;
-
-    lastPostedAt = now;
-    void notifySlack(`:hourglass_flowing_sand: ${escapeSlack(summary)}`, threadTs);
-  };
-};
+/** The last word on an issue: its pull request is merged or closed. */
+export const announceFinished = (tracked: Tracked, state: string) =>
+  notifySlack(
+    state === "MERGED"
+      ? `:white_check_mark: *Merged* — ${prLink(tracked)} is in \`${PR_BASE}\`, ${issueLink(tracked.issue)} is done.`
+      : `:no_entry_sign: *Closed without merging* — ${prLink(tracked)}. ${issueLink(tracked.issue)} was not implemented.`,
+    tracked.threadTs,
+  );

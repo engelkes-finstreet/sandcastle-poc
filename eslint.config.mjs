@@ -21,6 +21,10 @@ const eslintConfig = defineConfig([
       "scripts/**",
       "eslint.config.mjs",
       "playwright-report/**",
+      // A live Sandcastle run checks the branch out under .sandcastle/worktrees/,
+      // inside this repo. Without this, `pnpm lint` on the host tries to lint that
+      // copy and fails on every file — the paths are not in tsconfig's project.
+      ".sandcastle/**",
     ],
   },
   js.configs.recommended,

@@ -3,9 +3,10 @@
 The plan you wrote was approved on pull request {{PR_URL}}. Implement it, verify it, commit it,
 and stop.
 
-This continues the session where you planned, so you already have the context — the plan is
-repeated below because a session can be lost between the two runs, and because it is what you
-are held to.
+You did not write this plan — a previous run did, in a conversation you do not have. This is a
+fresh session, and the plan below plus this repo's skills are your whole brief. It has been read
+and approved by a human, so treat it as settled: build it, do not re-litigate it, and do not
+re-establish what it already states.
 
 ## The approved plan
 
@@ -25,9 +26,20 @@ that point. Otherwise implement the plan as written.
 - Recent commits: !`git log --oneline -3`
 - Working tree: !`git status --porcelain | head -10`
 
-You are on the branch the pull request is already open against, one empty commit ahead of the
-base. Dependencies are installed. This container is thrown away when you exit, so anything you
-do not commit is gone.
+You are on the branch the pull request is already open against. Dependencies are installed.
+
+The branch normally holds one empty `plan(#n)` commit and nothing else. If `git log` shows a
+`wip(#n)` commit as well, an earlier run on this branch died — a timeout, a dropped connection —
+and the host committed what it had written so it would not be lost. Treat that as a starting
+point, not as finished work: none of it passed the gate, some of it may be half a file, and the
+plan below is still the brief. Read it with `git show`, keep what is right, fix or delete the
+rest, and commit your own work on top. Say in your final message what you kept and what you
+threw away.
+
+This container is thrown away when you exit. The gate below still comes before your commit, so
+plan on committing once at the end — if the run dies before that, the host commits what is in the
+worktree as a `wip` commit for the next attempt. That is a safety net for a run that fails, not a
+way to hand work over: what it saves is unverified by definition.
 
 ## The issue, for reference
 
@@ -41,6 +53,16 @@ do not commit is gone.
    `modal`, and the rest are installed, along with the `finstreet-mcp` tools. They carry this
    repo's conventions — file layout, naming, which component to reach for. Code written
    without them tends to look plausible and land in the wrong place.
+
+   The plan names tasks and skills, not files, and that is deliberate — the skills carry the
+   detail. Resolve paths with `path-resolver` and let each skill decide the file layout; do not
+   treat the absence of a file list as licence to invent one.
+
+   **Read the skills, not the whole repo.** The plan was written by an agent that explored this
+   codebase, and anything it found that you could not reasonably work out yourself is already
+   written down — usually under open questions. So do not re-verify the plan's claims about how
+   a package behaves or which pattern this repo uses. Read what you need to write *this* code
+   and start writing.
 3. **`CLAUDE.md` at the repo root is binding** where it exists. Its rules about branching,
    pushing and opening pull requests do not apply to you — the host does that.
 4. **Verify.** This repo has no unit or integration test suite, so the gate is all three of:

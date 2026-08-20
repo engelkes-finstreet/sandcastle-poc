@@ -1,5 +1,14 @@
 # The code review is a stranger, and it is only a comment
 
+> **Scope, per `0006-a-shipped-pull-request-still-listens.md`:** the phase 5 rejected below — a
+> reviewer acting on its own findings — is still rejected, and for the reason given: that is a loop
+> with no human in it. `0006` adds a phase 5 of a different kind, which runs only because a person
+> typed `revise` on a pull request they were reading, and which is handed what that person wrote.
+> Phase 4 has no path into it: its comments carry `BOT_MARKER`, so they are invisible to the
+> trigger, and switching phase 4 on cannot wire it into a fix loop by accident. Note also that the
+> claim below that "phase 3 resumes phase 1" was true when this was written and was reversed by
+> `0004-the-implementation-run-starts-fresh.md`.
+
 Until now the plan was reviewed and the code was not. A human read a plan on a draft pull
 request and approved it; what came back an hour later was pushed, marked ready, and read by
 nobody until they got to it. The gate — `tsc --noEmit`, `pnpm lint`, `pnpm build` — proves the

@@ -1,12 +1,16 @@
 {
-  "extraKnownMarketplaces": {
-    "finstreet-plugins": {
-      "source": { "source": "github", "repo": "finstreet/claude-plugins" }
-    }
-  },
   "enabledPlugins": {
     "finstreet-dev@finstreet-plugins": true,
     "finstreet-fe@finstreet-plugins": true,
-    "playwright@claude-plugins-official": true
+    "playwright@claude-plugins-official": true,
+    "mattpocock-skills@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "finstreet-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "finstreet/claude-plugins"
+      }
+    }
   }
 }
