@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { AWAITING_LABEL, BASE_BRANCH, LABEL, MODEL, POLL_SECONDS, REVISION_LABEL } from "./config.mts";
 import { REPO, labelledIssueNumbers, queuedIssues } from "./github.mts";
-import { slackStatus } from "./notify.mts";
+import { mentionStatus, slackStatus } from "./notify.mts";
 import { rescueLeftovers } from "./phases.mts";
 import { describe, log } from "./shell.mts";
 import { controller, sleep } from "./shutdown.mts";
@@ -72,6 +72,7 @@ import type { Issue } from "./types.mts";
 log(`Watching ${REPO} for open issues labelled "${LABEL}".`);
 log(`Base ${BASE_BRANCH} · model ${MODEL} · polling every ${POLL_SECONDS}s · Ctrl-C to stop.`);
 log(`Slack notifications ${slackStatus}.`);
+log(`Pinging ${mentionStatus}.`);
 
 // A run that died without reaching workflow.mts's error path — Ctrl-C, `kill`, a
 // closed laptop, a crashed host — never got the chance to save what it had written.

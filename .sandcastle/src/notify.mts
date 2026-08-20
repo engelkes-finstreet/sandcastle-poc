@@ -8,7 +8,7 @@ import {
   logRefFor,
 } from "./config.mts";
 import { REPO } from "./github.mts";
-import { notifySlack, type SlackPost } from "./slack.mts";
+import { notifyAsk, notifySlack, type SlackPost } from "./slack.mts";
 import type {
   Attempt,
   AwaitingRevision,
@@ -20,7 +20,7 @@ import type {
   Verdict,
 } from "./types.mts";
 
-export { slackStatus } from "./slack.mts";
+export { mentionStatus, slackStatus } from "./slack.mts";
 
 // Every Slack message the watcher sends, in the order a run sends them. Kept
 // together and away from the state machine on purpose: the wording is what a
@@ -28,6 +28,18 @@ export { slackStatus } from "./slack.mts";
 // when you can read the whole conversation in one file.
 //
 // slack.mts is the transport (a token, a POST, a thread ts). This is the voice.
+//
+// **Two kinds of message, and the difference is a notification.** `notifySlack` is
+// a step: the factory did something and is carrying on. `notifyAsk` is a stop — the
+// factory is now waiting on a person — so it is addressed to SLACK_MENTION and
+// broadcast out of the thread into the channel.
+//
+// Which is which is not a matter of importance, it is a matter of *whose turn it
+// is*. "Plan posted" asks; "implementing now" does not. A run that came back
+// blocked asks, because somebody has to re-label the issue; a pull request that was
+// merged does not, because the person reading it is the one who merged it. Grep for
+// `notifyAsk` to see the whole list — it should stay short. Every message added to
+// it makes the rest quieter, and the point of a ping is that it means something.
 
 // -------------------------------------------------------------- ingredients
 
@@ -81,7 +93,7 @@ export const announcePlanning = (issue: Issue, queued: number): Promise<SlackPos
   );
 
 export const announcePlanningFailed = (issue: Issue, posted: string | undefined, threadTs?: string) =>
-  notifySlack(
+  notifyAsk(
     lines(
       `🏰 ${issueLink(issue)} — *planning failed*. No plan, no pull request.`,
       "The label is off the issue; re-add it to try again.",
@@ -97,7 +109,7 @@ export const announcePlanningBlocked = (
   posted: string | undefined,
   threadTs?: string,
 ) =>
-  notifySlack(
+  notifyAsk(
     lines(
       `🏰 ${issueLink(issue)} — *blocked at planning*. The agent says the issue does not say enough yet.`,
       `> ${why.split("\n")[0].slice(0, 220)}`,
@@ -112,7 +124,7 @@ export const announcePlanPosted = (
   branch: string,
   threadTs?: string,
 ) =>
-  notifySlack(
+  notifyAsk(
     lines(
       `🏰 *Plan posted, waiting for you* — <${pr.url}|PR #${pr.number}>`,
       `Plans ${issueLink(issue)}. Nothing is implemented yet; the branch holds one empty commit.`,
@@ -164,7 +176,7 @@ export const announceApproved = (tracked: Tracked, decision: Reviewed) =>
   );
 
 export const announceAttempt = (tracked: Tracked, attempt: Attempt, posted: string | undefined) =>
-  notifySlack(
+  notifyAsk(
     attempt.pullRequest
       ? lines(
           `🏰 *Done — ready for your review* · ${prLink(tracked)}`,
@@ -296,7 +308,7 @@ export const announceFollowUp = (
     ? "The watcher has stopped tracking this issue — merge the pull request, close it, or carry on with it yourself."
     : "Comment `revise` to try again.";
 
-  return notifySlack(
+  return notifyAsk(
     attempt.pullRequest
       ? lines(
           `🏰 *Change made — back to you* · ${prLink(tracked)}`,
@@ -326,7 +338,7 @@ export const announceFollowUp = (
  * stopped answering.
  */
 export const announceRoundsSpent = (tracked: AwaitingRevision, posted: string | undefined) =>
-  notifySlack(
+  notifyAsk(
     lines(
       `:hand: *Out of follow-up rounds* · ${prLink(tracked)}`,
       `${MAX_REVISION_ROUNDS} follow-ups have been spent on ${issueLink(tracked.issue)}, so the watcher ` +

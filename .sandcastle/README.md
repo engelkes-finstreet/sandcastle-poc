@@ -128,6 +128,7 @@ ignores something you thought you told it.
 | `GH_TOKEN` | fine-grained PAT, Issues read/write + Metadata read. Used *inside* the container to read issues |
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
+| `SLACK_MENTION` | optional, your Slack **member ID** (`U0123…`) — who gets @-mentioned when it is your turn. A user group (`S0123…`) or the literal `here`/`channel` also work |
 | `NPM_AUTH_TOKEN` | GitHub Packages token (`read:packages`) for `@finstreet/*` — `pnpm install` in the container 401s without it |
 | `FINSTREET_MCP_TOKEN` | bearer token for the `finstreet-mcp` server the `finstreet-fe` plugin carries — without it the server is configured but never connects |
 
@@ -144,22 +145,23 @@ One top-level post per issue; everything else replies under it, so the channel k
 per issue however long the review takes. Each update ends with the links that matter *for that
 step* — the point is never having to hunt for the right tab:
 
-| Update | Links it carries |
-|---|---|
-| 🏰 Planning #n | the issue |
-| 🏰 Plan posted, waiting for you | the plan (PR description), where to reply, the log |
-| 🏰 Plan approved — implementing now | your approval comment, the plan, the log |
-| 🏰 Done — ready for your review | files changed, the comment telling you how to test it, the log |
-| ✅ / 🔍 / ⚠️ Code review: clean / nits / concerns | the review comment, files changed, the log — *off right now* |
-| 🏰 Change requested by *you* — working on it | your request, files changed, the log |
-| 🏰 Change made — back to you | files changed, how to check it, the log, and how many rounds are left |
-| ✋ Out of follow-up rounds | the comment that says so, files changed |
-| ✅ Merged / 🚫 Closed | the pull request and the issue |
+| Update | Links it carries | Pings you |
+|---|---|---|
+| 🏰 Planning #n | the issue | |
+| 🏰 Plan posted, waiting for you | the plan (PR description), where to reply, the log | **yes** |
+| 🏰 Plan approved — implementing now | your approval comment, the plan, the log | |
+| 🏰 Done — ready for your review | files changed, the comment telling you how to test it, the log | **yes** |
+| ✅ / 🔍 / ⚠️ Code review: clean / nits / concerns | the review comment, files changed, the log — *off right now* | |
+| 🏰 Change requested by *you* — working on it | your request, files changed, the log | |
+| 🏰 Change made — back to you | files changed, how to check it, the log, and how many rounds are left | **yes** |
+| ✋ Out of follow-up rounds | the comment that says so, files changed | **yes** |
+| ✅ Merged / 🚫 Closed | the pull request and the issue | |
 
 The unhappy paths post too — planning failed, blocked at planning, abandoned, and the
 `blocked` / `no-signal` / `no-changes` outcomes — each linking the comment that explains itself.
-A Slack failure never fails a run: `notifySlack` swallows its own errors and the watcher logs a
-warning, because a missing notification is not a reason to lose an implementation.
+All of those ping you, because every one of them ends with something only you can do. A Slack
+failure never fails a run: `notifySlack` swallows its own errors and the watcher logs a warning,
+because a missing notification is not a reason to lose an implementation.
 
 Each issue gets **one thread**: a top-level "Working on #n" message when it is picked up, then
 the outcome and the merged/closed notice as replies under it. **Every message is a step, not a
@@ -167,6 +169,36 @@ sign of life.** There is no progress heartbeat — an agent's tool calls forward
 are a transcript nobody reads, and they push the message that actually needs answering off the
 screen. Between "planning" and "plan posted" the thread is quiet on purpose; `tail -f` the log
 if you want to watch it work.
+
+### A ping means it is your turn
+
+Slack treats a thread reply as a quieter thing than the message that started it: replies under a
+thread you are not following raise no badge and no push. That is fine for most of what the
+watcher says — and exactly wrong for the two or three messages that are the whole reason you are
+in the channel.
+
+So the messages split in two, and the line is **whose turn it is**, not how important the news
+is. `notifySlack` is a step, and stays inside the thread. `notifyAsk` is a *stop* — the factory
+has run out of things it can do without you — and it does two extra things:
+
+- it @-mentions `SLACK_MENTION`, since a mention is the only thing Slack reliably turns into a
+  notification wherever it lands;
+- it sets `reply_broadcast`, so a copy appears in the channel itself rather than only under the
+  thread.
+
+"Plan posted" asks. "Implementing now" does not. A run that came back `blocked` asks, because
+somebody has to re-label the issue; a pull request that got merged does not, because the person
+reading that message is the one who merged it. `grep notifyAsk src/notify.mts` is the whole list,
+and it should stay short — every message added to it makes the rest quieter, and then the one
+that mattered gets muted along with them. That is the same argument that removed the progress
+heartbeat.
+
+`SLACK_MENTION` must be an **ID**, not a name. `@patrick` in message text is plain text to Slack:
+it renders looking exactly like a mention and notifies nobody. Copy your member ID from your
+Slack profile (**⋮ → Copy member ID**). The watcher prints what it resolved at startup —
+`Pinging <@U0123…> on every message that needs a human` — and says so loudly when the value is
+not an ID, because that is the one misconfiguration the messages themselves look right under.
+Leave it unset and the asks still post and still broadcast; they just address nobody.
 
 **3. Check the sandbox.** `pnpm sandcastle:smoke` — repo readable, writes land, dependencies
 install as Linux binaries, and `tsc --noEmit` / `pnpm lint` / `pnpm build` all pass. Do this
@@ -184,7 +216,7 @@ Environment variables, all optional:
 | `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
-| `SLACK_BOT_TOKEN`, `SLACK_CHANNEL` | — | override `.env` |
+| `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `.env` |
 
 ## Outcomes
 

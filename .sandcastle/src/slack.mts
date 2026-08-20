@@ -12,8 +12,9 @@ import { fileURLToPath } from "node:url";
 //
 //   SLACK_BOT_TOKEN=xoxb-...
 //   SLACK_CHANNEL=C0123456789
+//   SLACK_MENTION=U0123456789     # optional; who to ping when it is their turn
 //
-// Either can come from the shell instead, which takes precedence.
+// Any of them can come from the shell instead, which takes precedence.
 //
 // Notifications are best-effort. A watcher that dies because Slack had a bad
 // minute would be worse than one that misses a ping.
@@ -40,6 +41,31 @@ const readEnvKey = (key: string) => {
 
 const TOKEN = process.env.SLACK_BOT_TOKEN ?? readEnvKey("SLACK_BOT_TOKEN");
 const CHANNEL = process.env.SLACK_CHANNEL ?? readEnvKey("SLACK_CHANNEL");
+const MENTION_RAW = process.env.SLACK_MENTION ?? readEnvKey("SLACK_MENTION");
+
+/**
+ * Turn whatever is in SLACK_MENTION into something Slack will actually notify on.
+ *
+ * The trap worth catching is a display name. `@patrick` in message text is plain
+ * text to Slack — it renders looking exactly like a mention and pings nobody, so a
+ * misconfiguration here is invisible in the one place you would look for it. Only
+ * an id works: a member id from your profile (⋮ → Copy member ID), a user group id,
+ * or the literal `here`/`channel`.
+ *
+ * The length floors are what keep a name like `Uwe` from being read as a member id.
+ */
+const renderMention = (raw: string | undefined) => {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  if (/^<[@!][^>]+>$/.test(value)) return value; // already Slack markup
+  if (/^[UW][A-Z0-9]{7,}$/.test(value)) return `<@${value}>`; // member
+  if (/^S[A-Z0-9]{7,}$/.test(value)) return `<!subteam^${value}>`; // user group
+  if (/^(here|channel)$/i.test(value)) return `<!${value.toLowerCase()}>`;
+  return undefined;
+};
+
+/** Prefixed onto every ask, or absent. See `notifyAsk`. */
+const MENTION = renderMention(MENTION_RAW);
 
 /** Reported at startup — half-configured is the interesting case, so name it. */
 export const slackStatus = TOKEN
@@ -50,6 +76,18 @@ export const slackStatus = TOKEN
     ? "off — SLACK_CHANNEL is set but SLACK_BOT_TOKEN is missing"
     : "off — set SLACK_BOT_TOKEN and SLACK_CHANNEL in .sandcastle/.env to get pinged";
 
+/**
+ * Who gets pinged, reported at startup next to `slackStatus` for the same reason:
+ * half-configured is the interesting case. A SLACK_MENTION that is not an id is
+ * the worst of those, because the messages still look right.
+ */
+export const mentionStatus = !MENTION_RAW
+  ? "nobody — set SLACK_MENTION to your Slack member ID to be pinged when it is your turn"
+  : MENTION
+    ? `${MENTION} on every message that needs a human`
+    : `nobody — SLACK_MENTION="${MENTION_RAW}" is not a Slack ID. Copy your member ID from your ` +
+      `Slack profile (⋮ → Copy member ID): a display name is plain text to Slack and pings no one`;
+
 export type SlackPost = {
   /** Slack's message id. Pass it back as `threadTs` to reply in its thread. */
   readonly ts?: string;
@@ -58,7 +96,11 @@ export type SlackPost = {
 };
 
 /** Post to Slack, optionally as a reply in an existing message's thread. */
-export const notifySlack = async (text: string, threadTs?: string): Promise<SlackPost> => {
+export const notifySlack = async (
+  text: string,
+  threadTs?: string,
+  broadcast = false,
+): Promise<SlackPost> => {
   if (!TOKEN || !CHANNEL) return {};
 
   try {
@@ -68,7 +110,13 @@ export const notifySlack = async (text: string, threadTs?: string): Promise<Slac
         authorization: `Bearer ${TOKEN}`,
         "content-type": "application/json; charset=utf-8",
       },
-      body: JSON.stringify({ channel: CHANNEL, text, thread_ts: threadTs }),
+      body: JSON.stringify({
+        channel: CHANNEL,
+        text,
+        thread_ts: threadTs,
+        // Only meaningful on a reply, and Slack rejects it without a thread_ts.
+        reply_broadcast: broadcast && Boolean(threadTs) ? true : undefined,
+      }),
     });
 
     // Slack answers 200 with `ok: false` for a bad token, an unknown channel or a
@@ -82,3 +130,20 @@ export const notifySlack = async (text: string, threadTs?: string): Promise<Slac
     return { error: error instanceof Error ? error.message : String(error) };
   }
 };
+
+/**
+ * The same post, marked as one the factory is waiting on a human for.
+ *
+ * Two things differ, and both exist because Slack treats a thread reply as a
+ * quieter thing than the message that started it. It is addressed to
+ * SLACK_MENTION, since a mention is the only thing Slack reliably turns into a
+ * notification wherever it lands. And it is broadcast, so a copy appears in the
+ * channel itself rather than only under a thread nobody is following — which is
+ * the actual complaint: the posts that need you most were the ones hardest to see.
+ *
+ * Reserved for exactly those posts. A ping on every step is a ping that gets
+ * muted, and then the one that mattered goes with it — the same argument that
+ * removed the progress heartbeat.
+ */
+export const notifyAsk = (text: string, threadTs?: string): Promise<SlackPost> =>
+  notifySlack(MENTION ? `${MENTION} ${text}` : text, threadTs, true);

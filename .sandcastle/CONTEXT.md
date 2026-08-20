@@ -82,6 +82,12 @@ Committing what a dead run left uncommitted in its worktree onto that run's bran
 commit. A checkpoint, never a claim that anything passed the gate — see
 `0005-a-dead-run-does-not-take-its-work-with-it.md`.
 
+**Ask**:
+A Slack post the factory has stopped on: it needs a person before anything else can happen. It
+is @-mentioned and broadcast out of its thread, and nothing else is — see
+`0007-a-ping-means-it-is-your-turn.md`.
+_Avoid_: alert, notification — both are true of every post, and the distinction is the point
+
 **Sandbox**:
 The container a run happens inside. Deleted when the run ends.
 
