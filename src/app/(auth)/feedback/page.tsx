@@ -1,4 +1,4 @@
-import { FeedbackPageContent } from "@/features/feedback/admin/components/FeedbackPageContent";
+import { FeedbackPageContent } from "@/features/feedback/components/FeedbackPageContent";
 import { Constants } from "@/shared/utils/constants";
 import { Headline } from "@finstreet/ui/components/base/Headline";
 import { PageContent } from "@finstreet/ui/components/pageLayout/PageContent";
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: `Feedback | ${Constants.companyName}`,
 };
 
-export default async function AdminFeedbackPage() {
+export default async function FeedbackPage() {
   const t = await getExtracted();
 
   return (

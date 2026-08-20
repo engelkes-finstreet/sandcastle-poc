@@ -1,8 +1,8 @@
 "use client";
 
-import { ConfirmFeedbackModal } from "@/features/feedback/admin/modals/ConfirmFeedbackModal/ConfirmFeedbackModal";
-import { SubmitFeedbackFormFields } from "@/features/feedback/admin/forms/submitFeedback/SubmitFeedbackFormFields";
-import { useSubmitFeedbackFormConfig } from "@/features/feedback/admin/forms/submitFeedback/useSubmitFeedbackFormConfig";
+import { ConfirmFeedbackModal } from "@/features/feedback/modals/ConfirmFeedbackModal/ConfirmFeedbackModal";
+import { SubmitFeedbackFormFields } from "@/features/feedback/forms/submitFeedback/SubmitFeedbackFormFields";
+import { useSubmitFeedbackFormConfig } from "@/features/feedback/forms/submitFeedback/useSubmitFeedbackFormConfig";
 import { Form } from "@/shared/components/form/Form";
 import { Box } from "@styled-system/jsx";
 import { useRef } from "react";

@@ -1,6 +1,6 @@
 "use client";
 
-import { SubmitFeedbackForm } from "@/features/feedback/admin/forms/submitFeedback/SubmitFeedbackForm";
+import { SubmitFeedbackForm } from "@/features/feedback/forms/submitFeedback/SubmitFeedbackForm";
 import { Banner } from "@finstreet/ui/components/base/Banner";
 import { Button } from "@finstreet/ui/components/base/Button";
 import { Panel } from "@finstreet/ui/components/base/Panel";

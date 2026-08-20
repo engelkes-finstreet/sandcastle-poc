@@ -1,4 +1,4 @@
-import { SubmitFeedbackFormType } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
+import { SubmitFeedbackFormType } from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
 import { DynamicFormField } from "@/shared/components/form/DynamicFormField";
 import { FieldNamesType, FormFieldsType } from "@finstreet/forms";
 import { VStack } from "@styled-system/jsx";

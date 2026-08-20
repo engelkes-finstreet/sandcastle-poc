@@ -1,4 +1,4 @@
-import { FeedbackCategory } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
+import { FeedbackCategory } from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
 import { useExtracted } from "next-intl";
 
 export type FeedbackCategoryOption = {

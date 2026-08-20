@@ -1,14 +1,14 @@
 "use client";
 
-import { getSubmitFeedbackDefaultValues } from "@/features/feedback/admin/forms/submitFeedback/getSubmitFeedbackDefaultValues";
-import { SubmitFeedbackFormActions } from "@/features/feedback/admin/forms/submitFeedback/SubmitFeedbackFormActions";
-import { submitFeedbackFormAction } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackFormAction";
+import { getSubmitFeedbackDefaultValues } from "@/features/feedback/forms/submitFeedback/getSubmitFeedbackDefaultValues";
+import { SubmitFeedbackFormActions } from "@/features/feedback/forms/submitFeedback/SubmitFeedbackFormActions";
+import { submitFeedbackFormAction } from "@/features/feedback/forms/submitFeedback/submitFeedbackFormAction";
 import {
   submitFeedbackSchema,
   SubmitFeedbackFormConfig,
-} from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
-import { useSubmitFeedbackFormFields } from "@/features/feedback/admin/forms/submitFeedback/useSubmitFeedbackFormFields";
-import { useConfirmFeedbackModal } from "@/features/feedback/admin/modals/ConfirmFeedbackModal/store";
+} from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
+import { useSubmitFeedbackFormFields } from "@/features/feedback/forms/submitFeedback/useSubmitFeedbackFormFields";
+import { useConfirmFeedbackModal } from "@/features/feedback/modals/ConfirmFeedbackModal/store";
 import { createFormFieldNames } from "@finstreet/forms/lib";
 
 type UseSubmitFeedbackFormConfigProps = {

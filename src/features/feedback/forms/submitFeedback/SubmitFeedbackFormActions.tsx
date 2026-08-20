@@ -1,7 +1,7 @@
 "use client";
 
-import { SubmitFeedbackFormType } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
-import { useConfirmFeedbackModal } from "@/features/feedback/admin/modals/ConfirmFeedbackModal/store";
+import { SubmitFeedbackFormType } from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
+import { useConfirmFeedbackModal } from "@/features/feedback/modals/ConfirmFeedbackModal/store";
 import { useFinstreetFormContext } from "@finstreet/forms";
 import { Button } from "@finstreet/ui/components/base/Button";
 import { HStack } from "@styled-system/jsx";

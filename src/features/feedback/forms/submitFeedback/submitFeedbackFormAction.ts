@@ -4,7 +4,7 @@ import {
   submitFeedbackSchema,
   SubmitFeedbackFormOutputType,
   SubmitFeedbackFormState,
-} from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
+} from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
 import { getExtracted } from "next-intl/server";
 
 export async function submitFeedbackFormAction(

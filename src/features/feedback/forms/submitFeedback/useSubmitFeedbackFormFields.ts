@@ -1,5 +1,5 @@
-import { useFeedbackCategoryOptions } from "@/features/feedback/admin/forms/submitFeedback/options/useFeedbackCategoryOptions";
-import { SubmitFeedbackFormType } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
+import { useFeedbackCategoryOptions } from "@/features/feedback/forms/submitFeedback/options/useFeedbackCategoryOptions";
+import { SubmitFeedbackFormType } from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
 import { FormFieldsType } from "@finstreet/forms";
 import { useExtracted } from "next-intl";
 

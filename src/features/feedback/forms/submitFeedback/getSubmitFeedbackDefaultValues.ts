@@ -1,4 +1,4 @@
-import { SubmitFeedbackDefaultValues } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
+import { SubmitFeedbackDefaultValues } from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
 
 export function getSubmitFeedbackDefaultValues(): SubmitFeedbackDefaultValues {
   return {

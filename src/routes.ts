@@ -24,6 +24,7 @@ export const routes = {
   unlockAccount: "/konto-entsperren",
   requestAccountUnlock: "/konto-entsperrung-anfordern",
   forbidden: "/zugriff-verweigert",
+  feedback: "/feedback",
   auth: {
     login: (loginParam?: LoginParams) =>
       buildPathWithParams<LoginParams>("/anmelden", loginParam),
@@ -39,9 +40,6 @@ export const routes = {
     members: {
       index: "/admin/benutzer",
       substitutes: (membershipId: string) => `/admin/benutzer/${membershipId}`,
-    },
-    feedback: {
-      index: "/admin/feedback",
     },
   },
   // TODO(boilerplate): Rename this "customer" key and its URL prefixes (/kunde/...)

@@ -1,8 +1,8 @@
 "use client";
 
-import { useFeedbackCategoryOptions } from "@/features/feedback/admin/forms/submitFeedback/options/useFeedbackCategoryOptions";
-import { SubmitFeedbackFormType } from "@/features/feedback/admin/forms/submitFeedback/submitFeedbackSchema";
-import { useConfirmFeedbackModal } from "@/features/feedback/admin/modals/ConfirmFeedbackModal/store";
+import { useFeedbackCategoryOptions } from "@/features/feedback/forms/submitFeedback/options/useFeedbackCategoryOptions";
+import { SubmitFeedbackFormType } from "@/features/feedback/forms/submitFeedback/submitFeedbackSchema";
+import { useConfirmFeedbackModal } from "@/features/feedback/modals/ConfirmFeedbackModal/store";
 import { useFinstreetFormContext } from "@finstreet/forms";
 import { useWatch } from "@finstreet/forms/rhf";
 import { Button } from "@finstreet/ui/components/base/Button";
