@@ -40,6 +40,7 @@ export const routes = {
       index: "/admin/benutzer",
       substitutes: (membershipId: string) => `/admin/benutzer/${membershipId}`,
     },
+    feedback: "/admin/feedback",
   },
   // TODO(boilerplate): Rename this "customer" key and its URL prefixes (/kunde/...)
   // to match the user group in your domain. Keep in sync with:
