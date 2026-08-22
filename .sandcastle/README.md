@@ -72,7 +72,7 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 ├── docs/adr/     why it behaves the way it does
 ├── Dockerfile    the image every run starts from
 ├── .env          secrets, gitignored — see below
-└── logs/ worktrees/ state/    per-run output, gitignored
+└── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
 ```
 
 Two things live in `.sandcastle` and only two: **code that runs on your machine** (`src/`) and
@@ -87,7 +87,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `workflow.mts` | the state machine — what to do with a new issue, and with anything you say on its pull request |
 | `phases.mts` | the agent runs, and how a container is configured for them |
 | `github.mts` | issues, labels, comments, and the draft pull request that carries the plan |
-| `notify.mts` | every Slack message, in the order a run sends them |
+| `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
 | `config.mts` | every knob, every path, every marker. Start here |
 | `types.mts` | the shapes that travel between the modules, `Tracked` above all |
@@ -95,6 +95,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `shutdown.mts` | Ctrl-C, and the sleep that returns early for it |
 | `sandbox.mts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test |
 | `slack.mts` | the transport: `chat.postMessage` over a bot token |
+| `watchtower.mts` | the other transport: the dashboard's event emitter, the identifiers, and the heartbeat |
 | `smoke.mts` | the health check — `pnpm sandcastle:smoke` |
 
 ### `prompts/` — one per run
@@ -129,6 +130,8 @@ ignores something you thought you told it.
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
 | `SLACK_MENTION` | optional, your Slack **member ID** (`U0123…`) — who gets @-mentioned when it is your turn. A user group (`S0123…`) or the literal `here`/`channel` also work |
+| `WATCHTOWER_URL` | optional, the Watchtower api's origin (`https://…`) — both this and the key come from its settings page |
+| `WATCHTOWER_API_KEY` | optional, `wt_…`, this repository's Project key. Shown once, at creation, and stored only as a hash |
 | `NPM_AUTH_TOKEN` | GitHub Packages token (`read:packages`) for `@finstreet/*` — `pnpm install` in the container 401s without it |
 | `FINSTREET_MCP_TOKEN` | bearer token for the `finstreet-mcp` server the `finstreet-fe` plugin carries — without it the server is configured but never connects |
 
@@ -137,7 +140,8 @@ falls back to the host shell's value, so `NPM_AUTH_TOKEN=` is enough when your `
 already exports it — the secret then lives in one place. A key that is *absent* from the file
 is not forwarded at all, whatever the shell says.
 
-Slack is optional; without it the watcher logs `Slack notifications off` and runs normally.
+Slack is optional; without it the watcher logs `Slack notifications off` and runs normally. So is
+Watchtower — see below.
 
 ### What the Slack thread looks like
 
@@ -200,6 +204,46 @@ Slack profile (**⋮ → Copy member ID**). The watcher prints what it resolved 
 not an ID, because that is the one misconfiguration the messages themselves look right under.
 Leave it unset and the asks still post in the thread; they just address nobody.
 
+### Watchtower — the same moments, on a dashboard
+
+Slack is a conversation: one thread per issue, and you read it as it happens. [Watchtower]
+answers the question a channel cannot — *what is every issue in every repository doing right
+now, and whose turn is it?* — as a board, a timeline per issue, and a "Needs you" strip. It is a
+second sink fed from the same list of moments, not a second source of truth.
+
+It is off until you onboard this repository, and off means off: no directory, no log line, no
+way to tell the package is installed.
+
+**Onboarding.** On Watchtower's `/settings/projects`, create a Project for this repository. It
+mints an API key, shows it exactly once, and gives you two lines. Paste them into
+`.sandcastle/.env` and restart the watcher:
+
+```
+WATCHTOWER_URL=http://localhost:3101
+WATCHTOWER_API_KEY=wt_…
+```
+
+The startup banner then says `Watchtower on (→ …/v1/events)`, or `off — …` naming which half is
+missing. There is no backfill: the watcher's startup sync reports whatever it currently has a
+state file for, so the board arrives already holding this morning's pull requests.
+
+**What it costs a run: nothing that matters.** The emitter never throws. A Watchtower that is
+*down* refuses the connection instantly and costs nothing measurable; one that *hangs* costs five
+seconds per message, and a failed send buys a 30-second cooldown so messages sent back to back
+pay it once — the phases between them are minutes long, so the six asks in a run each pay their
+own. Either way it is logged once per outage, not once per message. Events are written to
+`.sandcastle/watchtower/` before they are sent and drain on the next tick, so a network blip
+loses nothing. What is at stake when it fails is a card being briefly wrong, never a run.
+
+**One thing it remembers that the factory does not.** A re-labelled issue is planned from scratch
+as the *next attempt* of the same task, and the watcher cannot know that — its state file was
+deleted when the last attempt ended. So `watchtower.mts` keeps a counter in
+`.sandcastle/watchtower/generations.json`, bumped once per plan. Delete that directory and
+attempts count from 1 again, which Watchtower will decline as a step backwards until a fresh
+plan counts past it.
+
+[Watchtower]: https://github.com/finstreet/watchtower
+
 **3. Check the sandbox.** `pnpm sandcastle:smoke` — repo readable, writes land, dependencies
 install as Linux binaries, and `tsc --noEmit` / `pnpm lint` / `pnpm build` all pass. Do this
 before blaming the agent for anything.
@@ -217,6 +261,7 @@ Environment variables, all optional:
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `.env` |
+| `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `.env` |
 
 ## Outcomes
 

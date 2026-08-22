@@ -487,8 +487,13 @@ export const reviewCode = async (tracked: Tracked): Promise<CodeReview | undefin
 
 // -------------------------------------------------------- phase 5: follow-up
 
-/** How the change request reads in the prompt: who said what, oldest first. */
-const changeRequestText = (request: ChangeRequest) =>
+/**
+ * How the change request reads in the prompt: who said what, oldest first. Also
+ * what Watchtower's timeline shows as the request, via notify.mts — one rendering,
+ * so what the run was handed and what the dashboard says it was handed cannot
+ * drift apart.
+ */
+export const changeRequestText = (request: ChangeRequest) =>
   request.since.map(({ author, body }) => `**@${author} wrote:**\n\n${body}`).join("\n\n---\n\n");
 
 /**
