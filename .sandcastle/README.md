@@ -178,13 +178,13 @@ watcher says — and exactly wrong for the two or three messages that are the wh
 in the channel.
 
 So the messages split in two, and the line is **whose turn it is**, not how important the news
-is. `notifySlack` is a step, and stays inside the thread. `notifyAsk` is a *stop* — the factory
-has run out of things it can do without you — and it does two extra things:
+is. `notifySlack` is a step. `notifyAsk` is a *stop* — the factory has run out of things it can
+do without you — and it @-mentions `SLACK_MENTION`, because a mention is the one thing Slack
+reliably turns into a notification even under a thread nobody is following.
 
-- it @-mentions `SLACK_MENTION`, since a mention is the only thing Slack reliably turns into a
-  notification wherever it lands;
-- it sets `reply_broadcast`, so a copy appears in the channel itself rather than only under the
-  thread.
+That mention is the *only* difference. Everything the watcher says about an issue stays in that
+issue's thread, asks included — a copy in the channel adds nothing the mention has not already
+delivered, and it puts the message that needs answering away from the conversation it belongs to.
 
 "Plan posted" asks. "Implementing now" does not. A run that came back `blocked` asks, because
 somebody has to re-label the issue; a pull request that got merged does not, because the person
@@ -198,7 +198,7 @@ it renders looking exactly like a mention and notifies nobody. Copy your member 
 Slack profile (**⋮ → Copy member ID**). The watcher prints what it resolved at startup —
 `Pinging <@U0123…> on every message that needs a human` — and says so loudly when the value is
 not an ID, because that is the one misconfiguration the messages themselves look right under.
-Leave it unset and the asks still post and still broadcast; they just address nobody.
+Leave it unset and the asks still post in the thread; they just address nobody.
 
 **3. Check the sandbox.** `pnpm sandcastle:smoke` — repo readable, writes land, dependencies
 install as Linux binaries, and `tsc --noEmit` / `pnpm lint` / `pnpm build` all pass. Do this

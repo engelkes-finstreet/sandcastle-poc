@@ -96,11 +96,7 @@ export type SlackPost = {
 };
 
 /** Post to Slack, optionally as a reply in an existing message's thread. */
-export const notifySlack = async (
-  text: string,
-  threadTs?: string,
-  broadcast = false,
-): Promise<SlackPost> => {
+export const notifySlack = async (text: string, threadTs?: string): Promise<SlackPost> => {
   if (!TOKEN || !CHANNEL) return {};
 
   try {
@@ -114,8 +110,6 @@ export const notifySlack = async (
         channel: CHANNEL,
         text,
         thread_ts: threadTs,
-        // Only meaningful on a reply, and Slack rejects it without a thread_ts.
-        reply_broadcast: broadcast && Boolean(threadTs) ? true : undefined,
       }),
     });
 
@@ -134,16 +128,15 @@ export const notifySlack = async (
 /**
  * The same post, marked as one the factory is waiting on a human for.
  *
- * Two things differ, and both exist because Slack treats a thread reply as a
- * quieter thing than the message that started it. It is addressed to
- * SLACK_MENTION, since a mention is the only thing Slack reliably turns into a
- * notification wherever it lands. And it is broadcast, so a copy appears in the
- * channel itself rather than only under a thread nobody is following — which is
- * the actual complaint: the posts that need you most were the ones hardest to see.
+ * One thing differs: it is addressed to SLACK_MENTION, because a mention is the
+ * one thing Slack reliably turns into a notification even under a thread nobody
+ * is following. The post itself stays in the thread with every other message
+ * about that issue — a copy in the channel would say nothing the mention has not
+ * already said, and it would say it where the rest of the conversation is not.
  *
- * Reserved for exactly those posts. A ping on every step is a ping that gets
- * muted, and then the one that mattered goes with it — the same argument that
- * removed the progress heartbeat.
+ * Reserved for exactly the posts that stop on a person. A ping on every step is a
+ * ping that gets muted, and then the one that mattered goes with it — the same
+ * argument that removed the progress heartbeat.
  */
 export const notifyAsk = (text: string, threadTs?: string): Promise<SlackPost> =>
-  notifySlack(MENTION ? `${MENTION} ${text}` : text, threadTs, true);
+  notifySlack(MENTION ? `${MENTION} ${text}` : text, threadTs);

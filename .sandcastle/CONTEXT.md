@@ -84,8 +84,8 @@ commit. A checkpoint, never a claim that anything passed the gate — see
 
 **Ask**:
 A Slack post the factory has stopped on: it needs a person before anything else can happen. It
-is @-mentioned and broadcast out of its thread, and nothing else is — see
-`0007-a-ping-means-it-is-your-turn.md`.
+is @-mentioned, in its issue's thread like every other post, and nothing else is @-mentioned —
+see `0007-a-ping-means-it-is-your-turn.md`.
 _Avoid_: alert, notification — both are true of every post, and the distinction is the point
 
 **Sandbox**:

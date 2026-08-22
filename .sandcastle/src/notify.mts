@@ -31,8 +31,8 @@ export { mentionStatus, slackStatus } from "./slack.mts";
 //
 // **Two kinds of message, and the difference is a notification.** `notifySlack` is
 // a step: the factory did something and is carrying on. `notifyAsk` is a stop — the
-// factory is now waiting on a person — so it is addressed to SLACK_MENTION and
-// broadcast out of the thread into the channel.
+// factory is now waiting on a person — so it is addressed to SLACK_MENTION. Both
+// stay in the issue's thread; the mention is the whole difference.
 //
 // Which is which is not a matter of importance, it is a matter of *whose turn it
 // is*. "Plan posted" asks; "implementing now" does not. A run that came back
