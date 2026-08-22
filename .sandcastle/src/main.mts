@@ -6,6 +6,15 @@ import { rescueLeftovers } from "./phases.mts";
 import { describe, log } from "./shell.mts";
 import { controller, sleep } from "./shutdown.mts";
 import { loadTracked, statePath } from "./state.mts";
+import {
+  flushReports,
+  reportQueue,
+  reportStarted,
+  reportSync,
+  startHeartbeat,
+  watchtowerStatus,
+  workingOn,
+} from "./watchtower.mts";
 import { startIssue, serviceTracked } from "./workflow.mts";
 import type { Issue } from "./types.mts";
 
@@ -64,15 +73,16 @@ import type { Issue } from "./types.mts";
 //
 //   config.mts    every knob and path             state.mts     the state files
 //   types.mts     the shapes that travel          github.mts    issues, labels, the plan PR
-//   shell.mts     git, gh, logging                notify.mts    what Slack says, in order
-//   shutdown.mts  Ctrl-C, interruptible sleep     phases.mts    the agent runs
-//   sandbox.mts   the container and its startup   workflow.mts  what to do with an issue
-//   slack.mts     the Slack transport
+//   shell.mts     git, gh, logging                notify.mts      what both sinks say
+//   shutdown.mts  Ctrl-C, interruptible sleep     phases.mts      the agent runs
+//   sandbox.mts   the container and its startup   workflow.mts    what to do with an issue
+//   slack.mts     the Slack transport             watchtower.mts  the dashboard transport
 
 log(`Watching ${REPO} for open issues labelled "${LABEL}".`);
 log(`Base ${BASE_BRANCH} · model ${MODEL} · polling every ${POLL_SECONDS}s · Ctrl-C to stop.`);
 log(`Slack notifications ${slackStatus}.`);
 log(`Pinging ${mentionStatus}.`);
+log(`Watchtower ${watchtowerStatus}.`);
 
 // A run that died without reaching workflow.mts's error path — Ctrl-C, `kill`, a
 // closed laptop, a crashed host — never got the chance to save what it had written.
@@ -99,6 +109,16 @@ try {
   log(`Could not check for orphaned issues: ${describe(error)}`);
 }
 
+// Watchtower's board is seeded from the state files rather than from a backfill
+// script: the watcher says it is up, then says what it is already holding, and a
+// Project onboarded this morning has this afternoon's pull requests on it. Then
+// the heartbeat, which runs on its own timer rather than on this loop — see
+// startHeartbeat for why. All three are silent no-ops until the project is
+// onboarded, and none of them can fail a run.
+await reportStarted();
+await reportSync(loadTracked());
+startHeartbeat();
+
 /**
  * Tracked issues first, oldest first, and only then something new. It is the old
  * "service the pending issue before planning another" rule generalised: finish what
@@ -110,7 +130,9 @@ while (!controller.signal.aborted) {
   let worked = false;
 
   for (const issue of tracked) {
+    workingOn(issue.issue);
     const serviced = await serviceTracked(issue);
+    workingOn(undefined);
     if (serviced === "stopped") break;
     // State changed on disk, so the set of tracked issues is stale — go round
     // again and re-read it rather than servicing the rest against old records.
@@ -132,6 +154,11 @@ while (!controller.signal.aborted) {
     continue;
   }
 
+  // Everything currently labelled, whether or not this watcher is about to act on
+  // it. Watchtower reads it as the full truth about what is queued, so an issue
+  // that lost its label is dropped from the board by being absent from this.
+  await reportQueue(queue);
+
   // Relabelling normally keeps a tracked issue out of this queue, but somebody
   // re-adding the label by hand should not start a second run against a branch
   // that already has one.
@@ -146,7 +173,14 @@ while (!controller.signal.aborted) {
   const waiting = tracked.length > 0 ? `, ${tracked.length} in flight` : "";
   log(`#${issue.number} ${issue.title}${rest.length > 0 ? ` (${rest.length} more queued${waiting})` : waiting}`);
 
-  if (!(await startIssue(issue, rest.length))) break;
+  workingOn(issue);
+  const started = await startIssue(issue, rest.length);
+  workingOn(undefined);
+  if (!started) break;
 }
+
+// Whatever is still in the outbox has nowhere else to go: there is no next tick to
+// retry on, and an event that dies here is a card left saying something untrue.
+await flushReports();
 
 log("Watcher stopped.");

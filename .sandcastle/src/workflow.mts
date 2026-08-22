@@ -28,6 +28,7 @@ import {
   announcePlanningFailed,
   announceRevising,
   announceRoundsSpent,
+  reportUnclear,
 } from "./notify.mts";
 import {
   commitLeftovers,
@@ -133,7 +134,7 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
   relabel(issue, { add: AWAITING_LABEL, remove: LABEL });
 
   log(`  plan posted to ${pr.url} — waiting for a review comment`);
-  await announcePlanPosted(issue, pr, planned.branch, thread.ts);
+  await announcePlanPosted(issue, pr, planned.branch, planned.plan, thread.ts);
 
   return true;
 };
@@ -192,6 +193,10 @@ const clarify = async (tracked: Tracked, decision: Reviewed): Promise<Serviced> 
           `pull request and leaves the code where it is.`,
   );
   saveTracked({ ...tracked, repliedThrough: decision.at });
+  // No Slack message for this one — nothing happened, and a ping that says so is
+  // the ping people learn to ignore. Watchtower still hears it: a timeline that
+  // skipped the comment would leave the reply on the pull request unexplained.
+  await reportUnclear(tracked, decision);
   return "worked";
 };
 
