@@ -24,7 +24,7 @@ import {
   logFileFor,
   logRefFor,
 } from "./config.mts";
-import { issueRef, markReadyForReview, syncBranchFromOrigin } from "./github.mts";
+import { issuePromptArgs, issueRef, markReadyForReview, syncBranchFromOrigin } from "./github.mts";
 import { sandbox, startupCommands } from "./sandbox.mts";
 import { describe, git, log } from "./shell.mts";
 import { controller } from "./shutdown.mts";
@@ -285,9 +285,9 @@ export const planIssue = async (issue: Issue): Promise<Planned> => {
     ...runOptions(branch),
     name: `issue-${issue.key}-plan`,
     promptFile: PLAN_PROMPT,
-    // Still ISSUE_NUMBER on the wire to the prompts: they read the issue with
-    // `gh issue view {{ISSUE_NUMBER}}`, which the key satisfies on this tracker.
-    promptArgs: { ISSUE_NUMBER: issue.key, ISSUE_TITLE: issue.title },
+    // The issue's text arrives as ISSUE_TEXT, fetched on the host — the container
+    // has no tracker credential to read it itself.
+    promptArgs: issuePromptArgs(issue),
     output: Output.string({ tag: PLAN_TAG }),
   });
 
@@ -348,8 +348,7 @@ export const implementPlan = async (tracked: Tracked, approval: string): Promise
     name: `issue-${issue.key}-implement`,
     promptFile: IMPLEMENT_PROMPT,
     promptArgs: {
-      ISSUE_NUMBER: issue.key,
-      ISSUE_TITLE: issue.title,
+      ...issuePromptArgs(issue),
       PR_URL: prUrl,
       PLAN: tracked.plan,
       APPROVAL: approval,
@@ -534,8 +533,7 @@ export const followUp = async (
     name: `issue-${issue.key}-follow-up-${round}`,
     promptFile: FOLLOW_UP_PROMPT,
     promptArgs: {
-      ISSUE_NUMBER: issue.key,
-      ISSUE_TITLE: issue.title,
+      ...issuePromptArgs(issue),
       PR_URL: prUrl,
       PLAN: tracked.plan,
       REQUEST: changeRequestText(request),

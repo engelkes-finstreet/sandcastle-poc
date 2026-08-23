@@ -24,10 +24,10 @@ const ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
 /**
  * Read a single key out of .sandcastle/.env rather than loading the file.
  *
- * That file also holds GH_TOKEN, which is scoped for the sandbox's issue reads.
- * Loading it into the host process would shadow your own gh credentials for the
- * `git push` and `gh pr create` in main.mts, and those need permissions the
- * sandbox token does not have.
+ * That file holds the sandbox's credentials, and loading all of it into the
+ * host process would let one of them shadow a host credential — the `git push`
+ * and `gh pr create` in main.mts run on your own gh login, and a stray token
+ * from the env file must not be able to take their place.
  */
 const readEnvKey = (key: string) => {
   if (!existsSync(ENV_FILE)) return undefined;

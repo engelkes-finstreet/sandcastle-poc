@@ -46,6 +46,41 @@ export const issueRef = (key: string) => `#${key}`;
 
 export const issueUrl = (key: string) => `https://github.com/${REPO}/issues/${key}`;
 
+type IssueComment = { author?: { login?: string }; createdAt: string; body: string };
+
+/**
+ * The issue's full text — body and every comment, oldest first — fetched on the
+ * host and injected into the prompts as `{{ISSUE_TEXT}}`. The container never
+ * talks to the tracker: this read replaces the in-container `gh issue view`,
+ * which is what lets the sandbox run with no tracker credential at all. The
+ * text is frozen at container start by design — a comment made mid-run reaches
+ * the *next* run, through the watermarks in types.mts, not this one.
+ */
+const issueText = (key: string): string => {
+  const { body, comments } = JSON.parse(
+    gh("issue", "view", key, "--json", "body,comments"),
+  ) as { body: string; comments: IssueComment[] };
+
+  return [
+    body.trim() || "_The issue has no body._",
+    ...comments.map(
+      (c) => `**@${c.author?.login ?? "someone"} commented (${c.createdAt}):**\n\n${c.body.trim()}`,
+    ),
+  ].join("\n\n---\n\n");
+};
+
+/**
+ * Everything a prompt is told about the issue itself, in one place. ISSUE_NUMBER
+ * renders as `#{{ISSUE_NUMBER}}` in headings and `Refs` lines, which the key
+ * satisfies on this tracker; a tracker whose keys read differently is a change
+ * here, next to issueRef, not in the three phases that spread this.
+ */
+export const issuePromptArgs = (issue: Issue) => ({
+  ISSUE_NUMBER: issue.key,
+  ISSUE_TITLE: issue.title,
+  ISSUE_TEXT: issueText(issue.key),
+});
+
 /**
  * Queue order for issue keys: numeric-aware rather than plain lexicographic, so
  * "10" does not sort before "2" and the queue stays oldest-first — while a

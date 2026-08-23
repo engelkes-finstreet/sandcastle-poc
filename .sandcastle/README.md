@@ -126,7 +126,6 @@ ignores something you thought you told it.
 | Key | |
 |---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` on your host — lets the agent use your subscription |
-| `GH_TOKEN` | fine-grained PAT, Issues read/write + Metadata read. Used *inside* the container to read issues |
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
 | `SLACK_MENTION` | optional, your Slack **member ID** (`U0123…`) — who gets @-mentioned when it is your turn. A user group (`S0123…`) or the literal `here`/`channel` also work |
@@ -139,6 +138,11 @@ Every key in this file is forwarded into the container. A key listed with an **e
 falls back to the host shell's value, so `NPM_AUTH_TOKEN=` is enough when your `~/.zshrc`
 already exports it — the secret then lives in one place. A key that is *absent* from the file
 is not forwarded at all, whatever the shell says.
+
+Note what is *not* in the list: no GitHub credential ever enters the container. The host reads
+the issue — body and comments — with your own `gh` login and injects it into the prompts as
+`{{ISSUE_TEXT}}`, frozen at container start. Do not add a `GH_TOKEN` key here; the sandbox has
+no legitimate use for one.
 
 Slack is optional; without it the watcher logs `Slack notifications off` and runs normally. So is
 Watchtower — see below.
@@ -569,7 +573,7 @@ read it.
 
 | | |
 |---|---|
-| `The watcher needs an authenticated gh` | `gh auth login` on the host. This is your login, not the container's `GH_TOKEN`. |
+| `The watcher needs an authenticated gh` | `gh auth login` on the host. The host is the only place a GitHub credential exists — the container gets none. |
 | Slack says `not_in_channel` | `/invite @YourApp` in the target channel. |
 | Slack says `invalid_auth` | Wrong or revoked token, or a user token (`xoxp-`) where a bot token (`xoxb-`) is needed. |
 | `pnpm install` fails with `ERR_PNPM_FETCH_401` | `NPM_AUTH_TOKEN` did not reach the container. It must be listed as a key in `.sandcastle/.env` — an export in your shell alone is not forwarded. |

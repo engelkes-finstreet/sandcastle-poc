@@ -43,7 +43,10 @@ way to hand work over: what it saves is unverified by definition.
 
 ## The issue, for reference
 
-!`gh issue view {{ISSUE_NUMBER}} --comments`
+The full text — body and every comment, oldest first — as it stood when this container
+started. It is your only copy: this sandbox has no tracker credential.
+
+{{ISSUE_TEXT}}
 
 ## How to work
 
