@@ -10,7 +10,7 @@ import type {
   SyncedTask,
 } from "@finstreet/watchtower-golem/events";
 import { BASE_BRANCH, MAX_REVISION_ROUNDS, SANDCASTLE } from "./config.mts";
-import { REPO } from "./github.mts";
+import { issueUrl } from "./github.mts";
 import { describe, git, log } from "./shell.mts";
 import { controller } from "./shutdown.mts";
 import type { Issue, Outcome, Tracked } from "./types.mts";
@@ -87,14 +87,14 @@ export const flushReports = () => emitter.flush();
 // ------------------------------------------------------------- identifiers
 
 /**
- * How this factory's issues are named on the wire. `externalKey` is a string on
- * purpose — a bare issue number is never an identity, so nothing downstream can
- * be tempted to do arithmetic on it.
+ * How this factory's issues are named on the wire. The watcher's own identity for
+ * an issue is already the opaque string key the wire wants, so this only has to
+ * say which tracker minted it and where it lives.
  */
 export const refFor = (issue: Issue): ExternalRef => ({
   trackerType: "github",
-  externalKey: String(issue.number),
-  url: `https://github.com/${REPO}/issues/${issue.number}`,
+  externalKey: issue.key,
+  url: issueUrl(issue.key),
 });
 
 /** The same for a pull request, from whichever shape has one in hand. */
@@ -197,16 +197,16 @@ const persist = (current: Record<string, number>) => {
 };
 
 /** Which attempt this issue is on. Unknown means the first one. */
-export const generationOf = (issueNumber: number): number => loaded()[String(issueNumber)] ?? 1;
+export const generationOf = (issueKey: string): number => loaded()[issueKey] ?? 1;
 
 /**
  * A fresh plan is a fresh attempt, so this is the one place the number moves.
  * Called from announcePlanning; every event after it reads what it set.
  */
-export const nextGeneration = (issueNumber: number): number => {
+export const nextGeneration = (issueKey: string): number => {
   const current = loaded();
-  const next = (current[String(issueNumber)] ?? 0) + 1;
-  current[String(issueNumber)] = next;
+  const next = (current[issueKey] ?? 0) + 1;
+  current[issueKey] = next;
   persist(current);
   return next;
 };
@@ -219,7 +219,7 @@ export const nextGeneration = (issueNumber: number): number => {
  */
 export const about = (issue: Issue, threadTs?: string) => ({
   externalRef: refFor(issue),
-  generation: generationOf(issue.number),
+  generation: generationOf(issue.key),
   slackThreadTs: threadTs,
 });
 
@@ -249,7 +249,7 @@ const syncedFrom = (tracked: Tracked): SyncedTask => ({
   externalRef: refFor(tracked.issue),
   title: tracked.issue.title,
   status: SYNCED_STATUS[tracked.status],
-  generation: generationOf(tracked.issue.number),
+  generation: generationOf(tracked.issue.key),
   branch: tracked.branch,
   changeRequest: changeRequestOf(tracked),
   rounds: tracked.status === "awaiting-revision" ? tracked.revisionRounds : undefined,

@@ -35,21 +35,50 @@ export const REPO = (() => {
 
 // ------------------------------------------------------------------- issues
 
+/**
+ * The two renderings of an issue key, and the only place they are spelled. On this
+ * tracker a key reads as `#42` — in commits, comments, links and log lines — and
+ * lives at the issues URL. Nothing else may interpolate a key into either shape,
+ * so a tracker whose keys read differently (`ESCB-123`, no `#`) is a change here,
+ * not a hunt through the callers.
+ */
+export const issueRef = (key: string) => `#${key}`;
+
+export const issueUrl = (key: string) => `https://github.com/${REPO}/issues/${key}`;
+
+/**
+ * Queue order for issue keys: numeric-aware rather than plain lexicographic, so
+ * "10" does not sort before "2" and the queue stays oldest-first — while a
+ * non-numeric key (a future `ESCB-123`) still gets a stable, human-expected
+ * order. The locale is pinned so the order cannot vary with the host's.
+ */
+export const compareIssueKeys = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
+
+/** GitHub answers with numbers; the watcher's identity for an issue is the key. */
+const keyOf = (number: number) => String(number);
+
+const keyed = ({ number, title }: { number: number; title: string }): Issue => ({
+  key: keyOf(number),
+  title,
+});
+
 /** Oldest first, so the queue is FIFO rather than newest-wins. */
 export const queuedIssues = (): Issue[] =>
   (
     JSON.parse(
       gh("issue", "list", "--state", "open", "--label", LABEL, "--json", "number,title", "--limit", "50"),
-    ) as Issue[]
-  ).sort((a, b) => a.number - b.number);
+    ) as { number: number; title: string }[]
+  )
+    .map(keyed)
+    .sort((a, b) => compareIssueKeys(a.key, b.key));
 
-/** Issues wearing one of the watcher's state labels, for the startup orphan check. */
-export const labelledIssueNumbers = (label: string): number[] =>
+/** Keys of issues wearing one of the watcher's state labels, for the startup orphan check. */
+export const labelledIssueKeys = (label: string): string[] =>
   (
     JSON.parse(
       gh("issue", "list", "--state", "open", "--label", label, "--json", "number", "--limit", "50"),
     ) as { number: number }[]
-  ).map(({ number }) => number);
+  ).map(({ number }) => keyOf(number));
 
 /**
  * The GitHub-visible mirror of the two states a tracked issue can be in. Carried
@@ -80,13 +109,13 @@ export const ensureStateLabels = () => {
 };
 
 export const relabel = (issue: Issue, { add, remove }: { add?: string; remove?: string }) => {
-  const args = ["issue", "edit", String(issue.number)];
+  const args = ["issue", "edit", issue.key];
   if (add) args.push("--add-label", add);
   if (remove) args.push("--remove-label", remove);
   try {
     gh(...args);
   } catch (error) {
-    log(`  WARNING: could not relabel #${issue.number}: ${describe(error)}`);
+    log(`  WARNING: could not relabel ${issueRef(issue.key)}: ${describe(error)}`);
   }
 };
 
@@ -96,13 +125,13 @@ export const relabel = (issue: Issue, { add, remove }: { add?: string; remove?: 
  * retry loop, so it must not depend on the comment succeeding.
  */
 export const release = (issue: Issue, comment: string): string | undefined => {
-  gh("issue", "edit", String(issue.number), "--remove-label", LABEL);
+  gh("issue", "edit", issue.key, "--remove-label", LABEL);
   // `gh` prints the new comment's URL, which is what Slack links to. Never worth
   // failing a run over, so a broken comment degrades to a missing link.
   try {
-    return gh("issue", "comment", String(issue.number), "--body", `${comment}\n\n${BOT_MARKER}`);
+    return gh("issue", "comment", issue.key, "--body", `${comment}\n\n${BOT_MARKER}`);
   } catch (error) {
-    log(`  WARNING: could not comment on #${issue.number}: ${describe(error)}`);
+    log(`  WARNING: could not comment on ${issueRef(issue.key)}: ${describe(error)}`);
     return undefined;
   }
 };
@@ -134,7 +163,7 @@ const HOW_TO_REVIEW = [
 
 export const planBody = (pending: PlanDraft) =>
   [
-    `Closes #${pending.issue.number}`,
+    `Closes ${issueRef(pending.issue.key)}`,
     "",
     "## Plan",
     "",
@@ -162,7 +191,7 @@ const emptyPlanCommit = (issue: Issue, branch: string) => {
   const sha = capture("git", [
     "commit-tree", tree,
     "-p", parent,
-    "-m", `plan(#${issue.number}): ${issue.title}`,
+    "-m", `plan(${issueRef(issue.key)}): ${issue.title}`,
   ]);
   git("update-ref", `refs/heads/${branch}`, sha, parent);
 };

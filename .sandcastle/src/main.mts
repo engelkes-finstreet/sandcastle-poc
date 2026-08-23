@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { AWAITING_LABEL, BASE_BRANCH, LABEL, MODEL, POLL_SECONDS, REVISION_LABEL } from "./config.mts";
-import { REPO, labelledIssueNumbers, queuedIssues } from "./github.mts";
+import { REPO, issueRef, labelledIssueKeys, queuedIssues } from "./github.mts";
 import { mentionStatus, slackStatus } from "./notify.mts";
 import { rescueLeftovers } from "./phases.mts";
 import { describe, log } from "./shell.mts";
@@ -95,12 +95,12 @@ rescueLeftovers();
 // than leaving it silently parked forever.
 try {
   const orphans = [AWAITING_LABEL, REVISION_LABEL]
-    .flatMap(labelledIssueNumbers)
-    .filter((number) => !existsSync(statePath(number)));
+    .flatMap(labelledIssueKeys)
+    .filter((key) => !existsSync(statePath(key)));
 
   if (orphans.length > 0) {
     log(
-      `WARNING: #${[...new Set(orphans)].join(", #")} carry a Sandcastle state label but have no ` +
+      `WARNING: ${[...new Set(orphans)].map(issueRef).join(", ")} carry a Sandcastle state label but have no ` +
         `state in .sandcastle/state/. Their pull requests are not being polled — merge or close ` +
         `them, or re-add the "${LABEL}" label to the issue to start over.`,
     );
@@ -162,7 +162,7 @@ while (!controller.signal.aborted) {
   // Relabelling normally keeps a tracked issue out of this queue, but somebody
   // re-adding the label by hand should not start a second run against a branch
   // that already has one.
-  const fresh = queue.filter((issue) => !tracked.some((t) => t.issue.number === issue.number));
+  const fresh = queue.filter((issue) => !tracked.some((t) => t.issue.key === issue.key));
 
   if (fresh.length === 0) {
     await sleep(POLL_SECONDS);
@@ -171,7 +171,7 @@ while (!controller.signal.aborted) {
 
   const [issue, ...rest] = fresh;
   const waiting = tracked.length > 0 ? `, ${tracked.length} in flight` : "";
-  log(`#${issue.number} ${issue.title}${rest.length > 0 ? ` (${rest.length} more queued${waiting})` : waiting}`);
+  log(`${issueRef(issue.key)} ${issue.title}${rest.length > 0 ? ` (${rest.length} more queued${waiting})` : waiting}`);
 
   workingOn(issue);
   const started = await startIssue(issue, rest.length);

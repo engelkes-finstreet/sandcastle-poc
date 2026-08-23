@@ -9,6 +9,7 @@ import {
   commentOnPr,
   decide,
   ensureStateLabels,
+  issueRef,
   openPlanPullRequest,
   relabel,
   release,
@@ -69,7 +70,7 @@ const labelFor = (tracked: Tracked) =>
 /** Stop tracking an issue, and take its label off with it. */
 const forget = (tracked: Tracked) => {
   relabel(tracked.issue, { remove: labelFor(tracked) });
-  clearTracked(tracked.issue.number);
+  clearTracked(tracked.issue.key);
 };
 
 // ------------------------------------------------------------ phase 1: plan
@@ -88,11 +89,11 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
     planned = await planIssue(issue);
   } catch (error) {
     if (controller.signal.aborted) {
-      log(`  cancelled — #${issue.number} keeps its label and will be picked up next time.`);
+      log(`  cancelled — ${issueRef(issue.key)} keeps its label and will be picked up next time.`);
       return false;
     }
     const detail = describe(error);
-    log(`  #${issue.number} failed to plan: ${detail}`);
+    log(`  ${issueRef(issue.key)} failed to plan: ${detail}`);
     const posted = release(
       issue,
       `🏖️ The Sandcastle agent could not produce a plan for this issue:\n\n` +
@@ -105,7 +106,7 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
 
   if (planned.plan.startsWith(PLAN_BLOCKED)) {
     const why = planned.plan.slice(PLAN_BLOCKED.length).trim();
-    log(`  #${issue.number} → blocked at planning`);
+    log(`  ${issueRef(issue.key)} → blocked at planning`);
     const posted = release(
       issue,
       `🏖️ The Sandcastle agent read this issue and could not plan it:\n\n${why}\n\n` +
@@ -147,14 +148,14 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
  * issue's life, and the only ending this factory is really aiming for.
  */
 const gone = async (tracked: Tracked, state: string) => {
-  log(`  ${tracked.prUrl} is ${state.toLowerCase()} — dropping #${tracked.issue.number}`);
+  log(`  ${tracked.prUrl} is ${state.toLowerCase()} — dropping ${issueRef(tracked.issue.key)}`);
   forget(tracked);
   if (tracked.status === "awaiting-plan") await announcePlanGone(tracked, state);
   else await announceFinished(tracked, state);
 };
 
 const abandon = async (tracked: Tracked, decision: Reviewed) => {
-  log(`  #${tracked.issue.number} abandoned by ${decision.author}`);
+  log(`  ${issueRef(tracked.issue.key)} abandoned by ${decision.author}`);
   commentOnPr(
     tracked.prNumber,
     tracked.status === "awaiting-plan"
@@ -179,7 +180,7 @@ const abandon = async (tracked: Tracked, decision: Reviewed) => {
  * that is actually asked for.
  */
 const clarify = async (tracked: Tracked, decision: Reviewed): Promise<Serviced> => {
-  log(`  #${tracked.issue.number}: ${decision.author} commented, but not a trigger word — still waiting`);
+  log(`  ${issueRef(tracked.issue.key)}: ${decision.author} commented, but not a trigger word — still waiting`);
   commentOnPr(
     tracked.prNumber,
     tracked.status === "awaiting-plan"
@@ -204,7 +205,7 @@ const clarify = async (tracked: Tracked, decision: Reviewed): Promise<Serviced> 
 
 /** Approved: build it, report it, and hand the pull request over. */
 const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Serviced> => {
-  log(`  #${tracked.issue.number} approved by ${decision.author}`);
+  log(`  ${issueRef(tracked.issue.key)} approved by ${decision.author}`);
   await announceApproved(tracked, decision);
 
   let attempt: Attempt;
@@ -212,11 +213,11 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
     attempt = await implementPlan(tracked, decision.comment);
   } catch (error) {
     if (controller.signal.aborted) {
-      log(`  cancelled — #${tracked.issue.number} keeps its plan and stays tracked.`);
+      log(`  cancelled — ${issueRef(tracked.issue.key)} keeps its plan and stays tracked.`);
       return "stopped";
     }
     const detail = describe(error);
-    log(`  #${tracked.issue.number} errored while implementing: ${detail}`);
+    log(`  ${issueRef(tracked.issue.key)} errored while implementing: ${detail}`);
     // The run is gone, but whatever it wrote is still in a worktree on host disk that
     // git has registered against this branch — so commit it here, before the next run
     // clears the worktree. Nothing about this needs the network, which is the point:
@@ -224,7 +225,7 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
     attempt = hostFailureAttempt(tracked, detail, commitLeftovers(tracked.branch));
   }
 
-  log(`  #${tracked.issue.number} → ${attempt.outcome}`);
+  log(`  ${issueRef(tracked.issue.key)} → ${attempt.outcome}`);
   const posted = commentOnPr(tracked.prNumber, attempt.comment);
 
   // Only shipped code is worth keeping an eye on. Everything else has already said
@@ -298,11 +299,11 @@ export const codeReview = async (tracked: Tracked) => {
     review = await reviewCode(tracked);
   } catch (error) {
     if (controller.signal.aborted) {
-      log(`  cancelled — #${tracked.issue.number} is pushed and ready, but unreviewed.`);
+      log(`  cancelled — ${issueRef(tracked.issue.key)} is pushed and ready, but unreviewed.`);
       return;
     }
     const detail = describe(error);
-    log(`  #${tracked.issue.number} could not be reviewed: ${detail}`);
+    log(`  ${issueRef(tracked.issue.key)} could not be reviewed: ${detail}`);
     await announceCodeReviewSkipped(tracked, `the review run failed: ${detail}`);
     return;
   }
@@ -338,14 +339,14 @@ const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promis
   // the issue there, so nothing should arrive here already at the bound — but a state
   // file written before that was true, or one whose `forget` half-failed, would.
   if (tracked.revisionRounds >= MAX_REVISION_ROUNDS) {
-    log(`  #${tracked.issue.number} has spent all ${MAX_REVISION_ROUNDS} follow-up rounds — letting go`);
+    log(`  ${issueRef(tracked.issue.key)} has spent all ${MAX_REVISION_ROUNDS} follow-up rounds — letting go`);
     const posted = commentOnPr(tracked.prNumber, ROUNDS_SPENT);
     forget(tracked);
     await announceRoundsSpent(tracked, posted);
     return "worked";
   }
 
-  log(`  #${tracked.issue.number}: ${request.author} asked for a change`);
+  log(`  ${issueRef(tracked.issue.key)}: ${request.author} asked for a change`);
   await announceRevising(tracked, request);
 
   let attempt: Attempt;
@@ -353,15 +354,15 @@ const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promis
     attempt = await followUp(tracked, request);
   } catch (error) {
     if (controller.signal.aborted) {
-      log(`  cancelled — #${tracked.issue.number} keeps its pull request and stays tracked.`);
+      log(`  cancelled — ${issueRef(tracked.issue.key)} keeps its pull request and stays tracked.`);
       return "stopped";
     }
     const detail = describe(error);
-    log(`  #${tracked.issue.number} errored during follow-up: ${detail}`);
+    log(`  ${issueRef(tracked.issue.key)} errored during follow-up: ${detail}`);
     attempt = hostFailureAttempt(tracked, detail, commitLeftovers(tracked.branch));
   }
 
-  log(`  #${tracked.issue.number} → follow-up ${attempt.outcome}`);
+  log(`  ${issueRef(tracked.issue.key)} → follow-up ${attempt.outcome}`);
 
   // The round is spent either way — a failed follow-up must not be free, or a
   // pull request could never run out of them — and spending the last one is the

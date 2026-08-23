@@ -100,7 +100,7 @@ export const LOGS = join(SANDCASTLE, "logs");
 export const STATE = join(SANDCASTLE, "state");
 
 /** The branch an issue is planned and implemented on. */
-export const branchFor = (issueNumber: number) => `sandcastle/issue-${issueNumber}`;
+export const branchFor = (issueKey: string) => `sandcastle/issue-${issueKey}`;
 
 /** Log file for a branch's runs — all four phases of an issue append to one file. */
 export const logFileFor = (branch: string) => join(LOGS, `${branch.replaceAll("/", "-")}.log`);

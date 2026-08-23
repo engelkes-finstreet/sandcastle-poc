@@ -10,7 +10,7 @@ import {
   branchFor,
   logRefFor,
 } from "./config.mts";
-import { REPO } from "./github.mts";
+import { issueRef, issueUrl } from "./github.mts";
 import { changeRequestText } from "./phases.mts";
 import { notifyAsk, notifySlack, type SlackPost } from "./slack.mts";
 import type {
@@ -76,7 +76,7 @@ const escapeSlack = (text: string) =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
 const issueLink = (issue: Issue) =>
-  `<https://github.com/${REPO}/issues/${issue.number}|#${issue.number} ${escapeSlack(issue.title)}>`;
+  `<${issueUrl(issue.key)}|${issueRef(issue.key)} ${escapeSlack(issue.title)}>`;
 
 const prLink = (tracked: Pick<Tracked, "prUrl" | "prNumber">) =>
   `<${tracked.prUrl}|PR #${tracked.prNumber}>`;
@@ -149,7 +149,7 @@ const attemptResult = (tracked: Tracked, attempt: Attempt, posted: string | unde
  * that number moves, and every event after it reads what it set.
  */
 export const announcePlanning = async (issue: Issue, queued: number): Promise<SlackPost> => {
-  const branch = branchFor(issue.number);
+  const branch = branchFor(issue.key);
 
   const post = await notifySlack(
     lines(
@@ -160,7 +160,7 @@ export const announcePlanning = async (issue: Issue, queued: number): Promise<Sl
 
   await report("plan.started", () => ({
     externalRef: refFor(issue),
-    generation: nextGeneration(issue.number),
+    generation: nextGeneration(issue.key),
     slackThreadTs: post.ts,
     payload: {
       title: issue.title,
@@ -180,14 +180,14 @@ export const announcePlanningFailed = (issue: Issue, posted: string | undefined,
       lines(
         `🏰 ${issueLink(issue)} — *planning failed*. No plan, no pull request.`,
         "The label is off the issue; re-add it to try again.",
-        links(maybeLink(posted, "What went wrong"), logHint(branchFor(issue.number))),
+        links(maybeLink(posted, "What went wrong"), logHint(branchFor(issue.key))),
       ),
       threadTs,
     ),
     "plan.failed",
     () => ({
       ...about(issue, threadTs),
-      payload: { commentUrl: posted, logRef: logRefFor(branchFor(issue.number)) },
+      payload: { commentUrl: posted, logRef: logRefFor(branchFor(issue.key)) },
     }),
   );
 
