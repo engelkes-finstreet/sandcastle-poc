@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { STATE } from "./config.mts";
-import { compareIssueKeys } from "./github.mts";
 import { describe, log } from "./shell.mts";
+import { compareIssueKeys } from "./tracker.mts";
 import type { Tracked } from "./types.mts";
 
 // The watcher's memory across restarts, in .sandcastle/state/. An issue can wait

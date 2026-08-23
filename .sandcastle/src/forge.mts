@@ -1,20 +1,18 @@
-import {
-  ABANDONS,
-  APPROVES,
-  AWAITING_LABEL,
-  BOT_MARKER,
-  LABEL,
-  PR_BASE,
-  REVISES,
-  REVISION_LABEL,
-} from "./config.mts";
+import { ABANDONS, APPROVES, BOT_MARKER, LABEL, PR_BASE, REVISES } from "./config.mts";
 import { capture, describe, gh, git, log } from "./shell.mts";
-import type { Decision, Issue, PlanDraft, Reviewed, Said, Tracked } from "./types.mts";
+import type { Decision, PlanDraft, Reviewed, Said, Tracked } from "./types.mts";
 
-// Everything the watcher does to GitHub: read the queue, move labels, open the plan
-// pull request, read what a human said on one, comment. Writes that are only there
-// to keep a human informed degrade to a warning — losing a comment is not worth
-// losing a run.
+// The forge: everything pull-request-shaped. The branch push, the draft pull
+// request that carries the plan, comments on it, ready-for-review, reading what a
+// human said, and noticing a merge or a close.
+//
+// Deliberately not a port, and it gains no interface. Work can arrive from
+// different trackers — that seam is tracker.mts — but the code always goes to
+// GitHub, and an abstraction with one implementation is a fake seam somebody has
+// to maintain. See docs/adr/0008-the-tracker-is-a-port-the-forge-is-github.md.
+//
+// Writes that are only there to keep a human informed degrade to a warning —
+// losing a comment is not worth losing a run.
 
 /**
  * Doubles as the credential check. The watcher is usually started unattended, so
@@ -32,144 +30,6 @@ export const REPO = (() => {
     process.exit(1);
   }
 })();
-
-// ------------------------------------------------------------------- issues
-
-/**
- * The two renderings of an issue key, and the only place they are spelled. On this
- * tracker a key reads as `#42` — in commits, comments, links and log lines — and
- * lives at the issues URL. Nothing else may interpolate a key into either shape,
- * so a tracker whose keys read differently (`ESCB-123`, no `#`) is a change here,
- * not a hunt through the callers.
- */
-export const issueRef = (key: string) => `#${key}`;
-
-export const issueUrl = (key: string) => `https://github.com/${REPO}/issues/${key}`;
-
-type IssueComment = { author?: { login?: string }; createdAt: string; body: string };
-
-/**
- * The issue's full text — body and every comment, oldest first — fetched on the
- * host and injected into the prompts as `{{ISSUE_TEXT}}`. The container never
- * talks to the tracker: this read replaces the in-container `gh issue view`,
- * which is what lets the sandbox run with no tracker credential at all. The
- * text is frozen at container start by design — a comment made mid-run reaches
- * the *next* run, through the watermarks in types.mts, not this one.
- */
-const issueText = (key: string): string => {
-  const { body, comments } = JSON.parse(
-    gh("issue", "view", key, "--json", "body,comments"),
-  ) as { body: string; comments: IssueComment[] };
-
-  return [
-    body.trim() || "_The issue has no body._",
-    ...comments.map(
-      (c) => `**@${c.author?.login ?? "someone"} commented (${c.createdAt}):**\n\n${c.body.trim()}`,
-    ),
-  ].join("\n\n---\n\n");
-};
-
-/**
- * Everything a prompt is told about the issue itself, in one place. ISSUE_NUMBER
- * renders as `#{{ISSUE_NUMBER}}` in headings and `Refs` lines, which the key
- * satisfies on this tracker; a tracker whose keys read differently is a change
- * here, next to issueRef, not in the three phases that spread this.
- */
-export const issuePromptArgs = (issue: Issue) => ({
-  ISSUE_NUMBER: issue.key,
-  ISSUE_TITLE: issue.title,
-  ISSUE_TEXT: issueText(issue.key),
-});
-
-/**
- * Queue order for issue keys: numeric-aware rather than plain lexicographic, so
- * "10" does not sort before "2" and the queue stays oldest-first — while a
- * non-numeric key (a future `ESCB-123`) still gets a stable, human-expected
- * order. The locale is pinned so the order cannot vary with the host's.
- */
-export const compareIssueKeys = (a: string, b: string) => a.localeCompare(b, "en", { numeric: true });
-
-/** GitHub answers with numbers; the watcher's identity for an issue is the key. */
-const keyOf = (number: number) => String(number);
-
-const keyed = ({ number, title }: { number: number; title: string }): Issue => ({
-  key: keyOf(number),
-  title,
-});
-
-/** Oldest first, so the queue is FIFO rather than newest-wins. */
-export const queuedIssues = (): Issue[] =>
-  (
-    JSON.parse(
-      gh("issue", "list", "--state", "open", "--label", LABEL, "--json", "number,title", "--limit", "50"),
-    ) as { number: number; title: string }[]
-  )
-    .map(keyed)
-    .sort((a, b) => compareIssueKeys(a.key, b.key));
-
-/** Keys of issues wearing one of the watcher's state labels, for the startup orphan check. */
-export const labelledIssueKeys = (label: string): string[] =>
-  (
-    JSON.parse(
-      gh("issue", "list", "--state", "open", "--label", label, "--json", "number", "--limit", "50"),
-    ) as { number: number }[]
-  ).map(({ number }) => keyOf(number));
-
-/**
- * The GitHub-visible mirror of the two states a tracked issue can be in. Carried
- * for legibility rather than for correctness — the state files are the truth —
- * but with several issues in flight at once, "what does the watcher think it owns"
- * should be readable without opening .sandcastle/state/.
- */
-export const STATE_LABELS: Record<string, { color: string; description: string }> = {
-  [AWAITING_LABEL]: {
-    color: "BFD4F2",
-    description: "Sandcastle posted a plan and is waiting for a review comment",
-  },
-  [REVISION_LABEL]: {
-    color: "FEF2C0",
-    description: "Sandcastle shipped this and is waiting for `revise`, a merge or a close",
-  },
-};
-
-/** Best-effort: the flow works without the labels, it is just less legible on GitHub. */
-export const ensureStateLabels = () => {
-  for (const [name, { color, description }] of Object.entries(STATE_LABELS)) {
-    try {
-      gh("label", "create", name, "--color", color, "--description", description, "--force");
-    } catch (error) {
-      log(`  WARNING: could not create the "${name}" label: ${describe(error)}`);
-    }
-  }
-};
-
-export const relabel = (issue: Issue, { add, remove }: { add?: string; remove?: string }) => {
-  const args = ["issue", "edit", issue.key];
-  if (add) args.push("--add-label", add);
-  if (remove) args.push("--remove-label", remove);
-  try {
-    gh(...args);
-  } catch (error) {
-    log(`  WARNING: could not relabel ${issueRef(issue.key)}: ${describe(error)}`);
-  }
-};
-
-/**
- * Take the issue out of the queue and say why. The label comes off first: it is
- * the only thing standing between a permanently failing issue and an infinite
- * retry loop, so it must not depend on the comment succeeding.
- */
-export const release = (issue: Issue, comment: string): string | undefined => {
-  gh("issue", "edit", issue.key, "--remove-label", LABEL);
-  // `gh` prints the new comment's URL, which is what Slack links to. Never worth
-  // failing a run over, so a broken comment degrades to a missing link.
-  try {
-    return gh("issue", "comment", issue.key, "--body", `${comment}\n\n${BOT_MARKER}`);
-  } catch (error) {
-    log(`  WARNING: could not comment on ${issueRef(issue.key)}: ${describe(error)}`);
-    return undefined;
-  }
-};
 
 export const commentOnPr = (prNumber: number, body: string): string | undefined => {
   try {
@@ -196,9 +56,16 @@ const HOW_TO_REVIEW = [
   `  re-add the **${LABEL}** label to the issue to plan it again from scratch.`,
 ].join("\n");
 
-export const planBody = (pending: PlanDraft) =>
+/**
+ * `issueRef` is the tracker's rendering of the issue key — `#42` here, `ESCB-123`
+ * on another tracker — supplied by the caller rather than assumed, because the
+ * forge does not know which tracker minted the key. On a GitHub-tracked project
+ * the `Closes` clause is also what closes the issue on merge, which is why the
+ * tracker's `shipped` moment can be a no-op there.
+ */
+export const planBody = (pending: PlanDraft, issueRef: string) =>
   [
-    `Closes ${issueRef(pending.issue.key)}`,
+    `Closes ${issueRef}`,
     "",
     "## Plan",
     "",
@@ -220,20 +87,23 @@ export const planBody = (pending: PlanDraft) =>
  * It survives as the first commit of the pull request, which is a fair record of
  * how the branch started; a squash merge drops it entirely.
  */
-const emptyPlanCommit = (issue: Issue, branch: string) => {
+const emptyPlanCommit = (title: string, issueRef: string, branch: string) => {
   const tree = git("rev-parse", `${branch}^{tree}`);
   const parent = git("rev-parse", branch);
   const sha = capture("git", [
     "commit-tree", tree,
     "-p", parent,
-    "-m", `plan(${issueRef(issue.key)}): ${issue.title}`,
+    "-m", `plan(${issueRef}): ${title}`,
   ]);
   git("update-ref", `refs/heads/${branch}`, sha, parent);
 };
 
 /** Opens the draft pull request that carries the plan, and returns it. */
-export const openPlanPullRequest = (draft: PlanDraft): { url: string; number: number } => {
-  emptyPlanCommit(draft.issue, draft.branch);
+export const openPlanPullRequest = (
+  draft: PlanDraft,
+  issueRef: string,
+): { url: string; number: number } => {
+  emptyPlanCommit(draft.issue.title, issueRef, draft.branch);
   git("push", "--set-upstream", "origin", draft.branch);
 
   const existing = JSON.parse(
@@ -242,7 +112,7 @@ export const openPlanPullRequest = (draft: PlanDraft): { url: string; number: nu
 
   if (existing.length > 0) {
     const found = existing[0];
-    gh("pr", "edit", String(found.number), "--body", planBody(draft));
+    gh("pr", "edit", String(found.number), "--body", planBody(draft, issueRef));
     return found;
   }
 
@@ -252,7 +122,7 @@ export const openPlanPullRequest = (draft: PlanDraft): { url: string; number: nu
     "--base", PR_BASE,
     "--head", draft.branch,
     "--title", `${draft.issue.title} (plan)`,
-    "--body", planBody(draft),
+    "--body", planBody(draft, issueRef),
   );
   const url = output.split("\n").filter(Boolean).pop() ?? "";
   const { number } = JSON.parse(gh("pr", "view", url, "--json", "number")) as { number: number };

@@ -1,17 +1,32 @@
 # The Sandcastle Factory
 
-The agent factory in `.sandcastle/`: a long-running host process that turns labelled GitHub
-issues into pull requests by running Claude Code in disposable containers, with a human deciding
-at two points. This is not the product — the Next.js application the factory operates on has its
-own vocabulary, and none of it belongs here.
+The agent factory in `.sandcastle/`: a long-running host process that turns queued issues into
+pull requests by running Claude Code in disposable containers, with a human deciding at two
+points. This is not the product — the Next.js application the factory operates on has its own
+vocabulary, and none of it belongs here.
 
 ## Language
 
 ### The work
 
 **Issue**:
-A GitHub issue wearing the `Sandcastle` label. The only way work enters the factory.
+A unit of work queued in the tracker, identified by an opaque string key. The only way work
+enters the factory. On a GitHub-tracked project it is a GitHub issue wearing the `Sandcastle`
+label and its key is the issue number as a string.
 _Avoid_: ticket, task, story
+
+**Tracker**:
+Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
+text, the six lifecycle moments, the release comment, and both renderings of an issue's
+identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with GitHub as its first
+adapter. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
+_Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
+
+**Forge**:
+Where the code changes go: branches, the plan pull request, trigger-word comments,
+ready-for-review, merged and closed. Plain GitHub on purpose — not a port, and it gains no
+interface, per the same ADR.
+_Avoid_: treating tracker and forge as one thing, which is the conflation the split undid
 
 **Plan**:
 The kickoff task list phase 1 produces, which is also the description of the draft pull request

@@ -86,7 +86,9 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `main.mts` | the entry point: the banner, the orphan check, and the scheduler. Nothing else |
 | `workflow.mts` | the state machine — what to do with a new issue, and with anything you say on its pull request |
 | `phases.mts` | the agent runs, and how a container is configured for them |
-| `github.mts` | issues, labels, comments, and the draft pull request that carries the plan |
+| `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
+| `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
+| `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
 | `config.mts` | every knob, every path, every marker. Start here |
@@ -261,6 +263,7 @@ Environment variables, all optional:
 | | Default | |
 |---|---|---|
 | `SANDCASTLE_BASE` | `origin/main` | what branches are cut from, and what PRs target |
+| `SANDCASTLE_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state. `github` is the only one so far; anything else refuses to start |
 | `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |

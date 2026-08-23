@@ -10,9 +10,9 @@ import {
   branchFor,
   logRefFor,
 } from "./config.mts";
-import { issueRef, issueUrl } from "./github.mts";
 import { changeRequestText } from "./phases.mts";
 import { notifyAsk, notifySlack, type SlackPost } from "./slack.mts";
+import { changeRequestFor, changeRequestOf, tracker } from "./tracker.mts";
 import type {
   Attempt,
   AwaitingRevision,
@@ -23,16 +23,7 @@ import type {
   Tracked,
   Verdict,
 } from "./types.mts";
-import {
-  about,
-  changeRequestFor,
-  changeRequestOf,
-  endingOf,
-  nextGeneration,
-  outcomeOf,
-  refFor,
-  report,
-} from "./watchtower.mts";
+import { about, endingOf, nextGeneration, outcomeOf, report } from "./watchtower.mts";
 
 export { mentionStatus, slackStatus } from "./slack.mts";
 
@@ -75,8 +66,9 @@ export { mentionStatus, slackStatus } from "./slack.mts";
 const escapeSlack = (text: string) =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+/** Both halves of the link come from the tracker, so it points wherever the issue actually lives. */
 const issueLink = (issue: Issue) =>
-  `<${issueUrl(issue.key)}|${issueRef(issue.key)} ${escapeSlack(issue.title)}>`;
+  `<${tracker.externalRef(issue).url}|${tracker.issueRef(issue.key)} ${escapeSlack(issue.title)}>`;
 
 const prLink = (tracked: Pick<Tracked, "prUrl" | "prNumber">) =>
   `<${tracked.prUrl}|PR #${tracked.prNumber}>`;
@@ -159,7 +151,7 @@ export const announcePlanning = async (issue: Issue, queued: number): Promise<Sl
   );
 
   await report("plan.started", () => ({
-    externalRef: refFor(issue),
+    externalRef: tracker.externalRef(issue),
     generation: nextGeneration(issue.key),
     slackThreadTs: post.ts,
     payload: {
