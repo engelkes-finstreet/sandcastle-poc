@@ -374,6 +374,107 @@ knowing:
 Startup prints which moments are configured, right before the `Watching …` banner, so the answer
 to "will this move anything" is in the first lines of the log.
 
+#### Trying it for real, on a scratch issue
+
+Nothing below needs a second repository or a second Jira project. It does need an issue you are
+willing to have an agent read and a pull request you are willing to throw away, so use a scratch
+issue in ESCB — the transitions this exercises are the real ones on the real workflow.
+
+**1. Credentials, in the shell that will start the watcher.** Never in `.sandcastle/.env`:
+
+```bash
+export JIRA_EMAIL="you@finstreet.de"
+export JIRA_API_TOKEN="…"          # id.atlassian.com → Security → API tokens
+```
+
+Prove them before involving the watcher — this is the same call `verify()` makes:
+
+```bash
+curl -su "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+  https://finstreet-team.atlassian.net/rest/api/3/myself | jq .displayName
+```
+
+**2. Learn the transition names from the issue itself.** Names, not board columns: the button
+says *Start work* where the column says *In Progress*, and the map wants the button.
+
+```bash
+curl -su "$JIRA_EMAIL:$JIRA_API_TOKEN" \
+  https://finstreet-team.atlassian.net/rest/api/3/issue/ESCB-123/transitions |
+  jq -r '.transitions[] | "\(.name)  →  \(.to.name)"'
+```
+
+Run it again after each moment: the list is *not* fixed. It is what ESCB-123's current status
+offers, which is why the map resolves names at the moment rather than at startup — and why the
+skip line prints the offered names when a configured one is not among them.
+
+**3. Configure one moment first — `picked-up`.** It fires within seconds of the watcher
+noticing the label, so the wiring is confirmed or not before an agent has done any work:
+
+```json
+{ "picked-up": "Start work" }
+```
+
+**4. A scratch issue with a real, tiny task.** Give it a summary and a description an agent can
+act on ("add a `README` line documenting `pnpm sandcastle:smoke`") rather than a placeholder: an
+agent that declines to plan releases the issue right after the pickup, and every later moment
+goes untested. Label it **`Sandcastle`**.
+
+**5. Start the watcher.** A short poll and — until this branch is on `main` — the branch the
+factory is running from as the base:
+
+```bash
+SANDCASTLE_TRACKER=jira \
+SANDCASTLE_POLL_SECONDS=30 \
+SANDCASTLE_BASE=origin/sandcastle/epic-10 \
+pnpm sandcastle
+```
+
+The first three lines answer everything about configuration:
+
+```
+Jira: authenticated as … against https://finstreet-team.atlassian.net.
+Jira: transitions — picked-up → "Start work".
+Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandcastle".
+```
+
+**6. What to check, moment by moment.** The log line is the claim; Jira is the evidence.
+
+| After | The log says | Check in Jira |
+|---|---|---|
+| pickup | `jira: ESCB-123 → "Start work" (picked-up)` | the issue moved column, and its History tab records it |
+| the plan is posted | `jira: … (awaiting-approval)`, if configured | `Sandcastle` swapped for `Sandcastle:awaiting-approval`, a comment with the pull request link, and the branch and PR under **Development** — that panel is Jira matching the bare key, with no integration on our side |
+| you comment `approve` | `jira: … (implementing)`, if configured | the column again |
+| you merge | `jira: … (shipped)`, if configured | the column, **one** comment, and — the thing worth confirming — that the `stopped` moment one second later moved *nothing* |
+
+**7. Then break it on purpose**, because the failure modes are the reason the map is shaped this
+way. Each takes one edit and one poll:
+
+- **A name that does not resolve.** Put `"awaiting-approval": "Nope"` in the map. Expect
+  `offers no "Nope" transition at awaiting-approval — skipped (offered: …)`, the labels and the
+  comment landing anyway, and the run carrying on.
+- **A transition Jira refuses.** Point a moment at a transition whose screen requires a field
+  (a resolution, typically). Expect `WARNING: could not transition … Field 'resolution' is
+  required` and an unharmed run — then leave that moment unconfigured, because the map cannot
+  fill a required field.
+- **Nothing configured at all.** Empty the map, or `mv` the file away, and re-run: labels and
+  comments only, exactly as before the map existed. This is the one to try last — it is what
+  every other project gets.
+- **A misspelled moment.** `"picked_up"` instead of `"picked-up"`. The watcher refuses to start
+  and names the file and the six valid keys. A typo here is the one thing that is *not*
+  best-effort.
+
+**8. Clean up after yourself.** The scratch issue's label comes off when you merge or close the
+pull request, but the rest is yours to remove:
+
+```bash
+rm -f .sandcastle/state/issue-ESCB-123.json .sandcastle/logs/sandcastle-issue-ESCB-123.log
+git push origin --delete sandcastle/issue-ESCB-123
+```
+
+and transition the issue back by hand — the map has no reverse, on purpose. If you filled the
+map in for the trial and do not want it live yet, empty it again: it is committed, so leaving a
+name in there configures it for everybody.
+
 ## Outcomes
 
 **Phase 1** ends the issue's turn in one of two ways. Either a draft pull request exists and the
