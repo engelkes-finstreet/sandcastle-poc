@@ -125,6 +125,21 @@ export const WORKTREES = join(SANDCASTLE, "worktrees");
 export const LOGS = join(SANDCASTLE, "logs");
 export const STATE = join(SANDCASTLE, "state");
 
+/**
+ * The Jira transition map: lifecycle moment → the name of the Jira transition
+ * that moment should fire, read only when SANDCASTLE_TRACKER=jira. Committed
+ * rather than configured by environment, because which transitions a project's
+ * workflow offers is a property of the project, not of the shell that starts the
+ * watcher — and because filling it in should be a reviewable one-file change.
+ * Absent, or with every moment left empty, the Jira mirror is labels only.
+ * trackers/jira.mts is what reads and validates it.
+ */
+const JIRA_TRANSITIONS_FILE = "jira-transitions.json";
+export const JIRA_TRANSITIONS = join(SANDCASTLE, JIRA_TRANSITIONS_FILE);
+
+/** The same path as a human would quote it, for the messages that name the file. */
+export const JIRA_TRANSITIONS_REF = `.sandcastle/${JIRA_TRANSITIONS_FILE}`;
+
 /** The branch an issue is planned and implemented on. */
 export const branchFor = (issueKey: string) => `sandcastle/issue-${issueKey}`;
 

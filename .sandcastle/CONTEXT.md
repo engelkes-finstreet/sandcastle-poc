@@ -22,6 +22,19 @@ identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with 
 GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
 
+**Moment**:
+One of the six points in an issue's life the watcher tells its tracker about — picked-up,
+awaiting-approval, implementing, awaiting-revision, shipped, stopped. Fixed by the watcher; each
+adapter is free only in *how* it says one, and saying nothing is a legitimate way.
+_Avoid_: event, hook, state — the first two suggest something subscribable, and the states are
+the watcher's own (`Tracked["status"]`), which is a shorter list
+
+**Transition map**:
+`jira-transitions.json`: the committed, per-project file naming which Jira transition each moment
+fires. Optional entry by entry and absent by default, so the Jira mirror is labels-first until a
+team fills it in. Only the Jira adapter has one.
+_Avoid_: workflow config — the workflow is Jira's, and the map only names moves inside it
+
 **Forge**:
 Where the code changes go: branches, the plan pull request, trigger-word comments,
 ready-for-review, merged and closed. Plain GitHub on purpose — not a port, and it gains no

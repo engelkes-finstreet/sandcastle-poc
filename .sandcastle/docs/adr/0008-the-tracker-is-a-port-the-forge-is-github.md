@@ -53,6 +53,30 @@ request's `Closes` clause already closes the issue when it merges. A no-op is a 
 GitHub, not a gap in the port: a tracker with an "In Progress" of its own says it at those
 moments, and the watcher neither knows nor cares which kind it is talking to.
 
+*(Amended for the Jira transition map, #15.)* The Jira adapter is the tracker with an "In
+Progress" of its own, and how it says it stayed **out** of the port: which transition each of the
+six moments fires is declared in a committed per-project file,
+`.sandcastle/jira-transitions.json`, by transition *name*. Three things about that shape were
+deliberate. It is a file
+rather than environment variables, because which transitions a workflow offers is a property of
+the project and belongs in review, not in whoever's shell starts the watcher. It is names
+rather than ids, because an id is a per-workflow integer nobody can read. And nothing is
+resolved until the moment fires — Jira offers only the transitions the issue's current status
+allows, so there is no startup check to write, and a name the issue does not offer is a log line
+listing the ones it does. The unhappy paths all degrade the same way: what is unconfigured or
+unresolvable is skipped, and the labels — which every Jira project has, whatever its workflow —
+remain the mirror that has to work. The one thing that *is* loud is a misspelled moment key,
+because that would read as a factory ignoring the file.
+
+Two consequences of putting the map behind the adapter rather than on the port. The map is
+additive to the labels, not a replacement: with it empty the Jira mirror is byte-for-byte the
+labels-first one, which is what makes filling it in safe. And `shipped` gets the last word — the
+`stopped` the watcher fires one breath later, letting go of a merged issue, moves nothing,
+because a `stopped` transition would drag the issue back out of the status shipping just put it
+in. Nothing is ever transitioned *back*, either: an issue released before it was tracked keeps
+the status `picked-up` moved it to, and re-adding the label simply finds that transition no
+longer offered.
+
 ## The Forge is not a port
 
 Everything pull-request-shaped stays in `src/forge.mts` as plain GitHub with no interface over

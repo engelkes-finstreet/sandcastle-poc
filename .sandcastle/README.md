@@ -72,6 +72,7 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 ├── docs/adr/     why it behaves the way it does
 ├── Dockerfile    the image every run starts from
 ├── .env          secrets, gitignored — see below
+├── jira-transitions.json    moment → Jira transition, when the tracker is Jira
 └── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
 ```
 
@@ -88,7 +89,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `phases.mts` | the agent runs, and how a container is configured for them |
 | `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
 | `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
-| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, plus the comments GitHub's `Closes` clause makes unnecessary there — see below |
+| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, and the transition map — see below |
 | `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
@@ -274,6 +275,11 @@ Environment variables, all optional:
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `.env` |
 | `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `.env` |
 
+One piece of configuration is deliberately *not* an environment variable:
+`.sandcastle/jira-transitions.json`, which maps lifecycle moments to Jira workflow transitions.
+Which transitions a project's workflow offers is a property of the project, not of the shell
+that starts the watcher, so it is committed and reviewable — see below.
+
 ### Jira as the tracker
 
 `SANDCASTLE_TRACKER=jira` points the *intake* at Jira; everything else stays exactly where it
@@ -305,8 +311,68 @@ credential may enter the sandbox; the smoke test asserts their absence, the same
 you; a service account is a recorded follow-up). With Jira selected and either credential
 missing or rejected, the watcher refuses to start and says what to fix.
 
-Jira workflow *transitions* are not wired yet — the labels are the whole mirror. That is #15,
-the transition map.
+#### The transition map
+
+Labels are the mirror every Jira project gets for free. Moving the *workflow* — the board
+column the issue sits in — is opt-in, because a transition that exists on one project's workflow
+does not exist on another's. It is configured in **`.sandcastle/jira-transitions.json`**, which
+is committed, and which ships with all six lifecycle moments spelled out and empty:
+
+```json
+{
+  "picked-up": "",
+  "awaiting-approval": "",
+  "implementing": "",
+  "awaiting-revision": "",
+  "shipped": "",
+  "stopped": ""
+}
+```
+
+Fill one in with the name of a transition — the words on the button in Jira, matched ignoring
+case and surrounding space — and that moment moves the issue. A plausible ESCB filling:
+
+```json
+{
+  "picked-up": "In Progress",
+  "awaiting-approval": "In Review",
+  "shipped": "Done"
+}
+```
+
+The six moments are the watcher's, and they are the same six on every tracker:
+
+| Moment | Fires when |
+|---|---|
+| `picked-up` | the issue leaves the queue and phase 1 starts |
+| `awaiting-approval` | the plan is posted and a human's approval is what happens next |
+| `implementing` | approval landed and phase 3 starts |
+| `awaiting-revision` | the code shipped and the watcher is listening for `revise` |
+| `shipped` | the pull request merged |
+| `stopped` | the watcher let the issue go — abandoned, blocked, rounds spent, closed unmerged |
+
+Every entry is optional, and so is the file: with all six empty, or the file deleted, the mirror
+is labels only and Jira behaves exactly as it did before this existed. Four things worth
+knowing:
+
+- **Names are resolved at the moment, not at startup.** Jira offers only the transitions the
+  issue's *current* status allows, so a name is available at one moment and not at another. A
+  name the issue does not offer is skipped with a log line that lists the ones it does — which
+  is the fastest way to find out what belongs in the file. A workflow edited in Jira degrades
+  the mirror; it never fails a run.
+- **A misspelled *moment* is a startup failure.** The six keys above are the only ones allowed,
+  because a typo'd key would silently never fire and read as "transitions don't work". The
+  watcher says which file and which key, and stops.
+- **`shipped` is the last word.** On a merge the watcher fires `shipped` and then, letting go,
+  `stopped`. The stop that trails a ship moves nothing and says nothing — otherwise a `stopped`
+  transition would drag the issue back out of the status shipping just put it in.
+- **Nothing is ever transitioned back.** If a run fails before the issue is tracked, the
+  `Sandcastle` label comes off with a comment (as it always did) but the `picked-up` transition
+  stands: the map has no reverse. Re-adding the label picks the issue up again, and the
+  `picked-up` transition its status no longer offers is skipped with a log line.
+
+Startup prints which moments are configured, right before the `Watching …` banner, so the answer
+to "will this move anything" is in the first lines of the log.
 
 ## Outcomes
 

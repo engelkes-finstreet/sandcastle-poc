@@ -1,9 +1,12 @@
+import { existsSync, readFileSync } from "node:fs";
 import {
   AWAITING_LABEL,
   JIRA_API_TOKEN,
   JIRA_BASE_URL,
   JIRA_EMAIL,
   JIRA_PROJECT,
+  JIRA_TRANSITIONS,
+  JIRA_TRANSITIONS_REF,
   LABEL,
   REVISION_LABEL,
 } from "../config.mts";
@@ -23,8 +26,11 @@ import type { Issue, Tracked } from "../types.mts";
 // Write-back is thin: links and state, never prose. A comment when the plan is
 // posted (the PR link), a one-liner when the issue ships or the watcher lets
 // go, and the label swaps. Jira has no `Closes` clause, so unlike on GitHub the
-// `shipped` moment does real work here. Workflow transitions are the follow-up
-// issue's job (#15); until then the labels are the mirror.
+// `shipped` moment does real work here.
+//
+// On top of the labels sits the transition map: a committed file naming, per
+// moment, a Jira transition to fire. It ships empty, so labels-first is still
+// the behaviour until a team fills it in — see `readTransitionMap` below.
 //
 // Credentials are basic auth against the REST v3 API — JIRA_EMAIL plus a
 // personal API token — read from the host shell and never from
@@ -161,6 +167,8 @@ const adfDoc = (paragraphs: AdfNode[]): AdfNode => ({
 
 type JiraIssue = { key: string; fields?: { summary?: string } };
 type JiraSearch = { issues?: JiraIssue[] };
+type JiraTransition = { id?: string; name?: string };
+type JiraTransitions = { transitions?: JiraTransition[] };
 type JiraComment = { author?: { displayName?: string }; created?: string; body?: AdfNode };
 type JiraIssueText = {
   fields?: { description?: AdfNode | null; comment?: { comments?: JiraComment[]; total?: number } };
@@ -186,6 +194,98 @@ const flattened = (issue: JiraIssueText): string => {
   ].join("\n\n---\n\n");
 };
 
+// -------------------------------------------------------- the transition map
+
+/**
+ * Which Jira transition each lifecycle moment fires. Named rather than numbered:
+ * a transition id is a per-workflow integer nobody can read or review, while the
+ * name is the word on the button. Every entry is optional and so is the file, so
+ * a project that configures nothing keeps the labels-first mirror it started
+ * with — see `.sandcastle/jira-transitions.json`, which ships with all six
+ * moments spelled out and empty.
+ */
+type TransitionMap = Partial<Record<Moment["type"], string>>;
+
+/**
+ * The six moment names as values, which is what checking the file's keys needs.
+ * A Record over the union rather than a list of strings, deliberately: add a
+ * moment to the port and this file stops compiling until it says what that
+ * moment does here.
+ */
+const MOMENTS: Record<Moment["type"], true> = {
+  "picked-up": true,
+  "awaiting-approval": true,
+  implementing: true,
+  "awaiting-revision": true,
+  shipped: true,
+  stopped: true,
+};
+
+const MOMENT_NAMES = Object.keys(MOMENTS);
+
+// `hasOwn` rather than `in`, which would also answer yes to "toString" and
+// "constructor" — a typo that lands on an Object.prototype key would otherwise
+// pass the check below, print in the startup banner as configured, and never fire.
+const isMoment = (key: string): key is Moment["type"] => Object.hasOwn(MOMENTS, key);
+
+/**
+ * A map file that cannot be understood ends the process, like a missing
+ * credential and unlike anything else in this adapter. It is committed
+ * configuration a human just edited: a mistake in it should surface as a startup
+ * failure naming the file, not as six moments that quietly never fire.
+ */
+function unusableMap(detail: string): never {
+  console.error(
+    `${JIRA_TRANSITIONS_REF} cannot be read as a transition map: ${detail}\n\n` +
+      `It maps lifecycle moments to the names of Jira transitions, and every entry is optional:\n` +
+      `  { ${MOMENT_NAMES.map((moment) => `"${moment}": ""`).join(", ")} }\n` +
+      `An empty name means that moment does not move the workflow; deleting the file means none of ` +
+      `them do, and the mirror is labels only.`,
+  );
+  process.exit(1);
+}
+
+/**
+ * Read the map once, at construction. Validated rather than trusted, in the same
+ * spirit as SANDCASTLE_TRACKER: an unknown key is almost always a misspelled
+ * moment, and a misspelled moment is indistinguishable from a factory that
+ * ignores the file.
+ *
+ * Note what is *not* validated — the transition names themselves. Jira offers
+ * only the transitions an issue's current status allows, so a name is available
+ * at one moment and not at another and there is nothing to check up front; that
+ * resolution happens at the moment, in `moveWorkflow`.
+ */
+const readTransitionMap = (): TransitionMap => {
+  // Absent means labels-first — the deployment that never opted in.
+  if (!existsSync(JIRA_TRANSITIONS)) return {};
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(JIRA_TRANSITIONS, "utf8"));
+  } catch (error) {
+    unusableMap(describe(error));
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    unusableMap(`it holds ${Array.isArray(parsed) ? "an array" : `a JSON ${typeof parsed}`}, not an object`);
+  }
+
+  const map: TransitionMap = {};
+  for (const [key, name] of Object.entries(parsed)) {
+    if (!isMoment(key)) {
+      unusableMap(`"${key}" is not a lifecycle moment — the six are ${MOMENT_NAMES.join(", ")}`);
+    }
+    if (typeof name !== "string") {
+      unusableMap(`"${key}" must name a transition as a string, but holds ${JSON.stringify(name)}`);
+    }
+    // The shipped file spells all six keys out so that whoever fills it in can
+    // see them; an empty one is a moment left unconfigured, not a nameless
+    // transition to go looking for.
+    if (name.trim()) map[key] = name.trim();
+  }
+  return map;
+};
+
 // ---------------------------------------------------------------- adapter
 
 export const jiraTracker = (): Tracker => {
@@ -206,6 +306,12 @@ export const jiraTracker = (): Tracker => {
   const auth = Buffer.from(`${email}:${token}`).toString("base64");
   const call = (method: string, path: string, body?: unknown) => api(auth, method, path, body);
 
+  // Read here for the same reason the credentials are: construction is where an
+  // adapter reads its own configuration, so a GitHub deployment never opens this
+  // file and a Jira one never reads it twice.
+  const transitions = readTransitionMap();
+  const configured = Object.entries(transitions);
+
   const browseUrl = (key: string) => `${JIRA_BASE_URL}/browse/${key}`;
 
   const search = async (jql: string): Promise<JiraIssue[]> => {
@@ -215,6 +321,14 @@ export const jiraTracker = (): Tracker => {
     )) as JiraSearch;
     return result.issues ?? [];
   };
+
+  /**
+   * The transitions the issue is offering *now*. Asked per moment and never
+   * cached: Jira offers only what the issue's current status allows, and that
+   * status is whatever the last moment left it in.
+   */
+  const offeredTransitions = async (key: string): Promise<JiraTransition[]> =>
+    ((await call("GET", `/rest/api/3/issue/${key}/transitions`)) as JiraTransitions).transitions ?? [];
 
   /** Add and remove in one update; a label is created by being added, so no ensure step exists. */
   const relabel = async (issue: Issue, { add, remove }: { add?: string; remove?: string }) => {
@@ -248,11 +362,42 @@ export const jiraTracker = (): Tracker => {
   };
 
   /**
+   * Fire the transition this moment is mapped to, if it is mapped to one and the
+   * issue is offering it. Everything else — an unconfigured moment, a name this
+   * status does not offer, a rejected POST — is a log line and a shrug: a
+   * workflow edited in Jira degrades the mirror, never the factory. The offered
+   * names go into the skipped line, because they are exactly what belongs in the
+   * map file instead.
+   */
+  const moveWorkflow = async (issue: Issue, moment: Moment["type"]) => {
+    const wanted = transitions[moment];
+    if (!wanted) return;
+
+    try {
+      const offered = await offeredTransitions(issue.key);
+      // Loosely matched, because the name was typed into a JSON file by a human
+      // reading it off a button.
+      const match = offered.find((t) => t.name?.trim().toLowerCase() === wanted.toLowerCase());
+      if (!match?.id) {
+        log(
+          `  jira: ${issue.key} offers no "${wanted}" transition at ${moment} — skipped ` +
+            `(offered: ${offered.map((t) => t.name).filter(Boolean).join(", ") || "nothing"})`,
+        );
+        return;
+      }
+      await call("POST", `/rest/api/3/issue/${issue.key}/transitions`, { transition: { id: match.id } });
+      log(`  jira: ${issue.key} → "${match.name}" (${moment})`);
+    } catch (error) {
+      log(`  WARNING: could not transition ${issue.key} at ${moment}: ${describe(error)}`);
+    }
+  };
+
+  /**
    * On a merge the watcher says `shipped` and then, letting go, `stopped` — two
-   * moments, one breath apart, in the same turn. Both would comment; the second
+   * moments, one breath apart, in the same turn. Both would speak; the second
    * would only repeat the first. So `shipped` leaves its key here and the
-   * `stopped` that follows takes it back out, commenting only when it is the
-   * whole story (abandoned, failed, rounds spent, closed unmerged).
+   * `stopped` that follows takes it back out, speaking only when it is the whole
+   * story (abandoned, failed, rounds spent, closed unmerged).
    */
   const justShipped = new Set<string>();
 
@@ -263,39 +408,44 @@ export const jiraTracker = (): Tracker => {
 
   const signal = async (issue: Issue, moment: Moment) => {
     switch (moment.type) {
-      // Nothing labels-first has to say — the follow-up issue's transition map
-      // (#15) is what will move the Jira workflow at these moments.
+      // The two moments labels-first has nothing to say at. The map may.
       case "picked-up":
       case "implementing":
-        return;
+        break;
       case "awaiting-approval":
         await relabel(issue, { add: AWAITING_LABEL, remove: LABEL });
         await tryComment(issue.key, [
           paragraph(`🏰 Sandcastle posted a plan — approve or abandon on the pull request:`, moment.prUrl),
         ]);
-        return;
+        break;
       case "awaiting-revision":
         await relabel(issue, { add: REVISION_LABEL, remove: AWAITING_LABEL });
-        return;
+        break;
       case "shipped":
         justShipped.add(issue.key);
         await tryComment(issue.key, [
           paragraph(`🏰 Shipped — the pull request for this issue was merged:`, moment.prUrl),
         ]);
-        return;
+        break;
       case "stopped":
         await relabel(issue, { remove: STOP_LABEL[moment.from] });
-        if (!justShipped.delete(issue.key)) {
-          await tryComment(issue.key, [
-            paragraph(
-              `🏰 Sandcastle stopped tracking this issue — the pull request says why.` +
-                ` Add the "${LABEL}" label again to start over.`,
-              moment.prUrl,
-            ),
-          ]);
-        }
-        return;
+        // The stop that trails a ship takes the label off and says nothing else:
+        // the comment would repeat the ship's, and a second transition would move
+        // a workflow the ship has just settled — `shipped` is the last word on an
+        // issue that landed.
+        if (justShipped.delete(issue.key)) return;
+        await tryComment(issue.key, [
+          paragraph(
+            `🏰 Sandcastle stopped tracking this issue — the pull request says why.` +
+              ` Add the "${LABEL}" label again to start over.`,
+            moment.prUrl,
+          ),
+        ]);
+        break;
     }
+
+    // Every moment consults the map, which is why this is one call and not six.
+    await moveWorkflow(issue, moment.type);
   };
 
   return {
@@ -306,6 +456,14 @@ export const jiraTracker = (): Tracker => {
       try {
         const me = (await call("GET", "/rest/api/3/myself")) as { displayName?: string };
         log(`Jira: authenticated as ${me.displayName ?? email} against ${JIRA_BASE_URL}.`);
+        // Said out loud at startup because it is committed configuration nobody
+        // has been notified about: the operator should see which moments will move
+        // the workflow before an issue does it for them.
+        log(
+          configured.length
+            ? `Jira: transitions — ${configured.map(([moment, name]) => `${moment} → "${name}"`).join(", ")}.`
+            : `Jira: no transitions configured in ${JIRA_TRANSITIONS_REF}; the mirror is labels only.`,
+        );
       } catch (error) {
         console.error(
           `The watcher is configured for Jira (SANDCASTLE_TRACKER=jira) but ${JIRA_BASE_URL} ` +
