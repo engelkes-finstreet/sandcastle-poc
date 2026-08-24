@@ -3,7 +3,16 @@ import type { VERDICTS } from "./config.mts";
 // The shapes that travel between modules. No behaviour of its own — the state
 // file's format lives here, so a change to it is a change to one file.
 
-export type Issue = { readonly number: number; readonly title: string };
+/**
+ * An issue's identity is an opaque string key, not a number. On a GitHub-tracked
+ * project the key is the issue number rendered as a string ("42"), so everything
+ * derived from it — branches, state files, `#42` references — is byte-for-byte
+ * what it always was. Nothing may parse it, do arithmetic on it, or assume its
+ * shape: a Jira key (`ESCB-123`) has to be the same kind of thing to the watcher.
+ * The one demand made of a key is that it is branch- and filename-safe as-is —
+ * `branchFor` puts it in a git ref and `statePath` in a filename, unescaped.
+ */
+export type Issue = { readonly key: string; readonly title: string };
 
 /**
  * What every tracked issue carries, whichever state it is in.

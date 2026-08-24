@@ -2,17 +2,15 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 import { createEmitter, type EventBody } from "@finstreet/watchtower-golem/emitter";
 import type {
-  ChangeRequestRef,
   ChangeRequestState,
   EventType,
-  ExternalRef,
   RunOutcome,
   SyncedTask,
 } from "@finstreet/watchtower-golem/events";
 import { BASE_BRANCH, MAX_REVISION_ROUNDS, SANDCASTLE } from "./config.mts";
-import { REPO } from "./github.mts";
 import { describe, git, log } from "./shell.mts";
 import { controller } from "./shutdown.mts";
+import { changeRequestOf, tracker } from "./tracker.mts";
 import type { Issue, Outcome, Tracked } from "./types.mts";
 
 // Watchtower, the second sink. slack.mts's sibling and read the same way: the
@@ -86,26 +84,9 @@ export const flushReports = () => emitter.flush();
 
 // ------------------------------------------------------------- identifiers
 
-/**
- * How this factory's issues are named on the wire. `externalKey` is a string on
- * purpose — a bare issue number is never an identity, so nothing downstream can
- * be tempted to do arithmetic on it.
- */
-export const refFor = (issue: Issue): ExternalRef => ({
-  trackerType: "github",
-  externalKey: String(issue.number),
-  url: `https://github.com/${REPO}/issues/${issue.number}`,
-});
-
-/** The same for a pull request, from whichever shape has one in hand. */
-export const changeRequestFor = (pr: { number: number; url: string }): ChangeRequestRef => ({
-  kind: "github_pull_request",
-  key: String(pr.number),
-  url: pr.url,
-});
-
-export const changeRequestOf = (tracked: Pick<Tracked, "prNumber" | "prUrl">): ChangeRequestRef =>
-  changeRequestFor({ number: tracked.prNumber, url: tracked.prUrl });
+// The two wire refs — the issue's and the pull request's — both come from the
+// tracker port now, so a Task's identity is honest about which tracker minted
+// it: tracker.externalRef and changeRequestOf/changeRequestFor in tracker.mts.
 
 /** The factory says `no-changes`; the wire says `no_changes`. Mapped, never guessed. */
 const OUTCOMES: Record<Outcome, RunOutcome> = {
@@ -197,16 +178,16 @@ const persist = (current: Record<string, number>) => {
 };
 
 /** Which attempt this issue is on. Unknown means the first one. */
-export const generationOf = (issueNumber: number): number => loaded()[String(issueNumber)] ?? 1;
+export const generationOf = (issueKey: string): number => loaded()[issueKey] ?? 1;
 
 /**
  * A fresh plan is a fresh attempt, so this is the one place the number moves.
  * Called from announcePlanning; every event after it reads what it set.
  */
-export const nextGeneration = (issueNumber: number): number => {
+export const nextGeneration = (issueKey: string): number => {
   const current = loaded();
-  const next = (current[String(issueNumber)] ?? 0) + 1;
-  current[String(issueNumber)] = next;
+  const next = (current[issueKey] ?? 0) + 1;
+  current[issueKey] = next;
   persist(current);
   return next;
 };
@@ -218,8 +199,8 @@ export const nextGeneration = (issueNumber: number): number => {
  * as good a carrier as the next.
  */
 export const about = (issue: Issue, threadTs?: string) => ({
-  externalRef: refFor(issue),
-  generation: generationOf(issue.number),
+  externalRef: tracker.externalRef(issue),
+  generation: generationOf(issue.key),
   slackThreadTs: threadTs,
 });
 
@@ -246,10 +227,10 @@ const SYNCED_STATUS = {
 } as const;
 
 const syncedFrom = (tracked: Tracked): SyncedTask => ({
-  externalRef: refFor(tracked.issue),
+  externalRef: tracker.externalRef(tracked.issue),
   title: tracked.issue.title,
   status: SYNCED_STATUS[tracked.status],
-  generation: generationOf(tracked.issue.number),
+  generation: generationOf(tracked.issue.key),
   branch: tracked.branch,
   changeRequest: changeRequestOf(tracked),
   rounds: tracked.status === "awaiting-revision" ? tracked.revisionRounds : undefined,
@@ -285,7 +266,7 @@ export const reportSync = (tracked: readonly Tracked[]) =>
 export const reportQueue = (queued: readonly Issue[]) =>
   report("queue.snapshot", () => ({
     payload: {
-      queued: queued.map((issue) => ({ externalRef: refFor(issue), title: issue.title })),
+      queued: queued.map((issue) => ({ externalRef: tracker.externalRef(issue), title: issue.title })),
     },
   }));
 
@@ -300,7 +281,7 @@ export const workingOn = (issue: Issue | undefined) => {
 
 const beat = () =>
   report("Golem.heartbeat", () => ({
-    payload: { golemVersion, currentTask: currentTask ? refFor(currentTask) : null },
+    payload: { golemVersion, currentTask: currentTask ? tracker.externalRef(currentTask) : null },
   }));
 
 /**

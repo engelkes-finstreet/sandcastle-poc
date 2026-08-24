@@ -59,6 +59,14 @@ export const BASE_BRANCH = process.env.SANDCASTLE_BASE ?? "origin/main";
 export const MODEL = process.env.SANDCASTLE_MODEL ?? "opus";
 
 /**
+ * Which tracker adapter reads the queue and mirrors the watcher's state — see
+ * tracker.mts, which validates it against the adapters that actually exist.
+ * Unset means GitHub, so an existing deployment upgrades without touching
+ * anything.
+ */
+export const TRACKER = process.env.SANDCASTLE_TRACKER ?? "github";
+
+/**
  * The code review runs on a cheaper model than the work it reviews, on purpose.
  * Reviewing is a bounded reading task against a diff that already compiles — the
  * skills carry the judgement, so the model mostly has to follow them carefully.
@@ -100,7 +108,7 @@ export const LOGS = join(SANDCASTLE, "logs");
 export const STATE = join(SANDCASTLE, "state");
 
 /** The branch an issue is planned and implemented on. */
-export const branchFor = (issueNumber: number) => `sandcastle/issue-${issueNumber}`;
+export const branchFor = (issueKey: string) => `sandcastle/issue-${issueKey}`;
 
 /** Log file for a branch's runs — all four phases of an issue append to one file. */
 export const logFileFor = (branch: string) => join(LOGS, `${branch.replaceAll("/", "-")}.log`);

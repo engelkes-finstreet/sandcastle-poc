@@ -20,9 +20,9 @@ about where you are.
 - Git status (expected: empty apart from gitignored install output): !`git status --porcelain | head -20`
 - Recent commits: !`git log --oneline -3`
 - Toolchain: !`node --version; git --version; (claude --version || true); (pnpm --version || echo "pnpm: not installed"); (jq --version || true)`
-- GitHub CLI: !`gh repo view --json nameWithOwner -q .nameWithOwner 2>&1 || echo "gh: unavailable"`
 - Registry config: !`cat .npmrc 2>&1 || echo ".npmrc: MISSING"`
-- Credentials reaching the container (names only): !`env | grep -oE '^(NPM_AUTH_TOKEN|GH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|SLACK_BOT_TOKEN|FINSTREET_MCP_TOKEN)=' | sed 's/=$/: set/' || echo "none set"`
+- Credentials reaching the container (names only): !`env | grep -oE '^(NPM_AUTH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|SLACK_BOT_TOKEN|FINSTREET_MCP_TOKEN)=' | sed 's/=$/: set/' || echo "none set"`
+- Tracker credential (expected absent — the host feeds issue text into the prompts): !`env | grep -q '^GH_TOKEN=' && echo "GH_TOKEN: SET, and it should not be" || echo "GH_TOKEN: absent, as designed"`
 - Installed packages: !`ls node_modules/.pnpm 2>/dev/null | wc -l`
 - Native binaries: !`ls node_modules/.pnpm 2>/dev/null | grep -ciE "linux" | sed 's/^/linux: /'; ls node_modules/.pnpm 2>/dev/null | grep -ciE "darwin" | sed 's/^/darwin: /'`
 
@@ -122,8 +122,8 @@ going instead of trying to fix it.
 - Do not print the value of any token or secret, in the report or to stdout. Saying that a
   variable is set, or that a server connected, is all checks 6 and 9 need; the value is never
   useful. `claude mcp list` prints the MCP URL — redact any token that shows up inside it.
-- Do not open, comment on, or close GitHub issues or PRs. The `gh repo view` call in the
-  snapshot above is the only GitHub interaction in scope.
+- Do not talk to GitHub at all — no issue or PR reads, no `gh` calls. The container carries no
+  tracker credential by design, so there is nothing to prove by trying.
 
 ## Done
 

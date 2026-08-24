@@ -47,7 +47,10 @@ committing once at the end.
 
 ## The issue and the full conversation, for reference
 
-!`gh issue view {{ISSUE_NUMBER}} --comments`
+The issue's full text — body and every comment, oldest first — as it stood when this
+container started. It is your only copy: this sandbox has no tracker credential.
+
+{{ISSUE_TEXT}}
 
 ## How to work
 

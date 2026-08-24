@@ -10,9 +10,9 @@ import {
   branchFor,
   logRefFor,
 } from "./config.mts";
-import { REPO } from "./github.mts";
 import { changeRequestText } from "./phases.mts";
 import { notifyAsk, notifySlack, type SlackPost } from "./slack.mts";
+import { changeRequestFor, changeRequestOf, tracker } from "./tracker.mts";
 import type {
   Attempt,
   AwaitingRevision,
@@ -23,16 +23,7 @@ import type {
   Tracked,
   Verdict,
 } from "./types.mts";
-import {
-  about,
-  changeRequestFor,
-  changeRequestOf,
-  endingOf,
-  nextGeneration,
-  outcomeOf,
-  refFor,
-  report,
-} from "./watchtower.mts";
+import { about, endingOf, nextGeneration, outcomeOf, report } from "./watchtower.mts";
 
 export { mentionStatus, slackStatus } from "./slack.mts";
 
@@ -75,8 +66,9 @@ export { mentionStatus, slackStatus } from "./slack.mts";
 const escapeSlack = (text: string) =>
   text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+/** Both halves of the link come from the tracker, so it points wherever the issue actually lives. */
 const issueLink = (issue: Issue) =>
-  `<https://github.com/${REPO}/issues/${issue.number}|#${issue.number} ${escapeSlack(issue.title)}>`;
+  `<${tracker.externalRef(issue).url}|${tracker.issueRef(issue.key)} ${escapeSlack(issue.title)}>`;
 
 const prLink = (tracked: Pick<Tracked, "prUrl" | "prNumber">) =>
   `<${tracked.prUrl}|PR #${tracked.prNumber}>`;
@@ -149,7 +141,7 @@ const attemptResult = (tracked: Tracked, attempt: Attempt, posted: string | unde
  * that number moves, and every event after it reads what it set.
  */
 export const announcePlanning = async (issue: Issue, queued: number): Promise<SlackPost> => {
-  const branch = branchFor(issue.number);
+  const branch = branchFor(issue.key);
 
   const post = await notifySlack(
     lines(
@@ -159,8 +151,8 @@ export const announcePlanning = async (issue: Issue, queued: number): Promise<Sl
   );
 
   await report("plan.started", () => ({
-    externalRef: refFor(issue),
-    generation: nextGeneration(issue.number),
+    externalRef: tracker.externalRef(issue),
+    generation: nextGeneration(issue.key),
     slackThreadTs: post.ts,
     payload: {
       title: issue.title,
@@ -180,14 +172,14 @@ export const announcePlanningFailed = (issue: Issue, posted: string | undefined,
       lines(
         `🏰 ${issueLink(issue)} — *planning failed*. No plan, no pull request.`,
         "The label is off the issue; re-add it to try again.",
-        links(maybeLink(posted, "What went wrong"), logHint(branchFor(issue.number))),
+        links(maybeLink(posted, "What went wrong"), logHint(branchFor(issue.key))),
       ),
       threadTs,
     ),
     "plan.failed",
     () => ({
       ...about(issue, threadTs),
-      payload: { commentUrl: posted, logRef: logRefFor(branchFor(issue.number)) },
+      payload: { commentUrl: posted, logRef: logRefFor(branchFor(issue.key)) },
     }),
   );
 

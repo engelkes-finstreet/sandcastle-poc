@@ -24,10 +24,11 @@ import {
   logFileFor,
   logRefFor,
 } from "./config.mts";
-import { markReadyForReview, syncBranchFromOrigin } from "./github.mts";
+import { markReadyForReview, syncBranchFromOrigin } from "./forge.mts";
 import { sandbox, startupCommands } from "./sandbox.mts";
 import { describe, git, log } from "./shell.mts";
 import { controller } from "./shutdown.mts";
+import { issuePromptArgs, tracker } from "./tracker.mts";
 import type {
   Attempt,
   AwaitingRevision,
@@ -100,8 +101,8 @@ const reviewComment = (verdict: Verdict, body: string) =>
 
 // ------------------------------------------ rescuing what a dead run left behind
 
-/** An issue branch, for the `Refs #n` line of a rescue commit. */
-const ISSUE_BRANCH = /^sandcastle\/issue-(\d+)$/;
+/** An issue branch, for the `Refs` line of a rescue commit. The capture is the issue key. */
+const ISSUE_BRANCH = /^sandcastle\/issue-(.+)$/;
 
 type HostWorktree = { readonly path: string; readonly branch: string };
 
@@ -165,15 +166,15 @@ const commitWorktree = ({ path, branch }: HostWorktree): number => {
     // .env are all gitignored, so what is left is what the agent wrote.
     git("-C", path, "add", "-A");
 
-    const issue = ISSUE_BRANCH.exec(branch)?.[1];
+    const key = ISSUE_BRANCH.exec(branch)?.[1];
     git(
       "-C", path,
       "commit",
       "--no-verify",
       "-m",
-      `wip(${issue ? `#${issue}` : branch}): uncommitted work from a run that died` +
+      `wip(${key ? tracker.issueRef(key) : branch}): uncommitted work from a run that died` +
         `\n\nCommitted by the Sandcastle host, not by the agent. It never passed the gate.` +
-        (issue ? `\n\nRefs #${issue}` : ""),
+        (key ? `\n\nRefs ${tracker.issueRef(key)}` : ""),
     );
 
     log(`  rescued ${dirty.length} uncommitted file(s) onto ${branch} as a wip commit`);
@@ -278,14 +279,16 @@ const runOptions = (branch: string, model: string = MODEL) => {
 
 /** Reads the issue, runs the kickoff skill, writes no code. */
 export const planIssue = async (issue: Issue): Promise<Planned> => {
-  const branch = branchFor(issue.number);
+  const branch = branchFor(issue.key);
   log(`  planning on ${branch}, cut from ${BASE_BRANCH}`);
 
   const result = await run({
     ...runOptions(branch),
-    name: `issue-${issue.number}-plan`,
+    name: `issue-${issue.key}-plan`,
     promptFile: PLAN_PROMPT,
-    promptArgs: { ISSUE_NUMBER: String(issue.number), ISSUE_TITLE: issue.title },
+    // The issue's text arrives as ISSUE_TEXT, fetched on the host — the container
+    // has no tracker credential to read it itself.
+    promptArgs: issuePromptArgs(issue),
     output: Output.string({ tag: PLAN_TAG }),
   });
 
@@ -339,15 +342,14 @@ const unshipped = (outcome: Outcome, { branch, logRef, commits }: Ran, body: (re
  */
 export const implementPlan = async (tracked: Tracked, approval: string): Promise<Attempt> => {
   const { issue, branch, prNumber, prUrl } = tracked;
-  log(`  implementing #${issue.number} on ${branch}`);
+  log(`  implementing ${tracker.issueRef(issue.key)} on ${branch}`);
 
   const result = await run({
     ...runOptions(branch),
-    name: `issue-${issue.number}-implement`,
+    name: `issue-${issue.key}-implement`,
     promptFile: IMPLEMENT_PROMPT,
     promptArgs: {
-      ISSUE_NUMBER: String(issue.number),
-      ISSUE_TITLE: issue.title,
+      ...issuePromptArgs(issue),
       PR_URL: prUrl,
       PLAN: tracked.plan,
       APPROVAL: approval,
@@ -447,14 +449,14 @@ export const implementPlan = async (tracked: Tracked, approval: string): Promise
  */
 export const reviewCode = async (tracked: Tracked): Promise<CodeReview | undefined> => {
   const { issue, branch } = tracked;
-  log(`  reviewing #${issue.number} on ${branch} with model ${REVIEW_MODEL}`);
+  log(`  reviewing ${tracker.issueRef(issue.key)} on ${branch} with model ${REVIEW_MODEL}`);
 
   const result = await run({
     ...runOptions(branch, REVIEW_MODEL),
-    name: `issue-${issue.number}-code-review`,
+    name: `issue-${issue.key}-code-review`,
     promptFile: CODE_REVIEW_PROMPT,
     promptArgs: {
-      ISSUE_NUMBER: String(issue.number),
+      ISSUE_NUMBER: issue.key,
       ISSUE_TITLE: issue.title,
       PLAN: tracked.plan,
       BASE: BASE_BRANCH,
@@ -481,7 +483,7 @@ export const reviewCode = async (tracked: Tracked): Promise<CodeReview | undefin
   }
 
   const verdict = verdictOf(result.stdout);
-  log(`  #${issue.number} reviewed → ${verdict}`);
+  log(`  ${tracker.issueRef(issue.key)} reviewed → ${verdict}`);
   return { verdict, comment: reviewComment(verdict, body), strayCommits };
 };
 
@@ -523,17 +525,16 @@ export const followUp = async (
 ): Promise<Attempt> => {
   const { issue, branch, prUrl } = tracked;
   const round = tracked.revisionRounds + 1;
-  log(`  follow-up ${round}/${MAX_REVISION_ROUNDS} for #${issue.number} on ${branch}`);
+  log(`  follow-up ${round}/${MAX_REVISION_ROUNDS} for ${tracker.issueRef(issue.key)} on ${branch}`);
 
   syncBranchFromOrigin(branch);
 
   const result = await run({
     ...runOptions(branch),
-    name: `issue-${issue.number}-follow-up-${round}`,
+    name: `issue-${issue.key}-follow-up-${round}`,
     promptFile: FOLLOW_UP_PROMPT,
     promptArgs: {
-      ISSUE_NUMBER: String(issue.number),
-      ISSUE_TITLE: issue.title,
+      ...issuePromptArgs(issue),
       PR_URL: prUrl,
       PLAN: tracked.plan,
       REQUEST: changeRequestText(request),

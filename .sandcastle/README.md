@@ -86,7 +86,9 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `main.mts` | the entry point: the banner, the orphan check, and the scheduler. Nothing else |
 | `workflow.mts` | the state machine — what to do with a new issue, and with anything you say on its pull request |
 | `phases.mts` | the agent runs, and how a container is configured for them |
-| `github.mts` | issues, labels, comments, and the draft pull request that carries the plan |
+| `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
+| `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
+| `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
 | `config.mts` | every knob, every path, every marker. Start here |
@@ -126,7 +128,6 @@ ignores something you thought you told it.
 | Key | |
 |---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` on your host — lets the agent use your subscription |
-| `GH_TOKEN` | fine-grained PAT, Issues read/write + Metadata read. Used *inside* the container to read issues |
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
 | `SLACK_MENTION` | optional, your Slack **member ID** (`U0123…`) — who gets @-mentioned when it is your turn. A user group (`S0123…`) or the literal `here`/`channel` also work |
@@ -139,6 +140,11 @@ Every key in this file is forwarded into the container. A key listed with an **e
 falls back to the host shell's value, so `NPM_AUTH_TOKEN=` is enough when your `~/.zshrc`
 already exports it — the secret then lives in one place. A key that is *absent* from the file
 is not forwarded at all, whatever the shell says.
+
+Note what is *not* in the list: no GitHub credential ever enters the container. The host reads
+the issue — body and comments — with your own `gh` login and injects it into the prompts as
+`{{ISSUE_TEXT}}`, frozen at container start. Do not add a `GH_TOKEN` key here; the sandbox has
+no legitimate use for one.
 
 Slack is optional; without it the watcher logs `Slack notifications off` and runs normally. So is
 Watchtower — see below.
@@ -257,6 +263,7 @@ Environment variables, all optional:
 | | Default | |
 |---|---|---|
 | `SANDCASTLE_BASE` | `origin/main` | what branches are cut from, and what PRs target |
+| `SANDCASTLE_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state. `github` is the only one so far; anything else refuses to start |
 | `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
@@ -569,7 +576,7 @@ read it.
 
 | | |
 |---|---|
-| `The watcher needs an authenticated gh` | `gh auth login` on the host. This is your login, not the container's `GH_TOKEN`. |
+| `The watcher needs an authenticated gh` | `gh auth login` on the host. The host is the only place a GitHub credential exists — the container gets none. |
 | Slack says `not_in_channel` | `/invite @YourApp` in the target channel. |
 | Slack says `invalid_auth` | Wrong or revoked token, or a user token (`xoxp-`) where a bot token (`xoxb-`) is needed. |
 | `pnpm install` fails with `ERR_PNPM_FETCH_401` | `NPM_AUTH_TOKEN` did not reach the container. It must be listed as a key in `.sandcastle/.env` — an export in your shell alone is not forwarded. |

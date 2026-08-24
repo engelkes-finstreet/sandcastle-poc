@@ -13,7 +13,11 @@ the deliverable and it has to stand on its own.
 
 ## The issue
 
-!`gh issue view {{ISSUE_NUMBER}} --comments`
+The full text — body and every comment, oldest first — as it stood when this container
+started. It is your only copy: this sandbox has no tracker credential, so there is nothing
+more to fetch.
+
+{{ISSUE_TEXT}}
 
 ## Where you are
 
@@ -40,9 +44,10 @@ The skill named on a task carries it into the implementation on its own.
 
 ## What to explore
 
-Read before you plan: the issue and its comments, `CLAUDE.md` if present, the existing code
-nearest to what the issue asks for, and the conventions in neighbouring files. If the issue
-references a Jira ticket, a Confluence page or another issue, read that too.
+Read before you plan: the issue and its comments above, `CLAUDE.md` if present, the existing
+code nearest to what the issue asks for, and the conventions in neighbouring files. If the
+issue references a Jira ticket, a Confluence page or another issue, you cannot fetch it from
+here — when what it holds would change the plan, that is an open question, not a guess.
 
 Explore as deeply as you like, then write briefly — but be deliberate about *which* brevity.
 The test for every fact you learned is: **would a competent agent, holding this plan and this
@@ -100,8 +105,9 @@ gets rejected.
 - **Change nothing.** No edits, no new files, no commits, no branches, no pushes. This run is
   read-only; the worktree must be exactly as you found it. Anything you write here is thrown
   away, and a stray file confuses the implementation run.
-- **Do not touch the issue or any pull request.** Reading with `gh` is fine — `gh issue view`,
-  `gh pr list`. The host posts your plan for you.
+- **Do not touch the issue or any pull request — you could not anyway.** This container has
+  no tracker credential; the issue text above is the whole of what the tracker would tell
+  you, and the host posts your plan for you.
 - Do not print the value of any token or secret.
 
 ## Done

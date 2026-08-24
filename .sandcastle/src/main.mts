@@ -1,11 +1,11 @@
 import { existsSync } from "node:fs";
-import { AWAITING_LABEL, BASE_BRANCH, LABEL, MODEL, POLL_SECONDS, REVISION_LABEL } from "./config.mts";
-import { REPO, labelledIssueNumbers, queuedIssues } from "./github.mts";
+import { BASE_BRANCH, LABEL, MODEL, POLL_SECONDS } from "./config.mts";
 import { mentionStatus, slackStatus } from "./notify.mts";
 import { rescueLeftovers } from "./phases.mts";
 import { describe, log } from "./shell.mts";
 import { controller, sleep } from "./shutdown.mts";
 import { loadTracked, statePath } from "./state.mts";
+import { tracker } from "./tracker.mts";
 import {
   flushReports,
   reportQueue,
@@ -71,14 +71,15 @@ import type { Issue } from "./types.mts";
 //
 // This file is the loop and nothing else. The parts it drives:
 //
-//   config.mts    every knob and path             state.mts     the state files
-//   types.mts     the shapes that travel          github.mts    issues, labels, the plan PR
-//   shell.mts     git, gh, logging                notify.mts      what both sinks say
-//   shutdown.mts  Ctrl-C, interruptible sleep     phases.mts      the agent runs
-//   sandbox.mts   the container and its startup   workflow.mts    what to do with an issue
-//   slack.mts     the Slack transport             watchtower.mts  the dashboard transport
+//   config.mts    every knob and path             state.mts       the state files
+//   types.mts     the shapes that travel          tracker.mts     the Tracker port; trackers/ its adapters
+//   shell.mts     git, gh, logging                forge.mts       the plan PR and everything PR-shaped
+//   shutdown.mts  Ctrl-C, interruptible sleep     notify.mts      what both sinks say
+//   sandbox.mts   the container and its startup   phases.mts      the agent runs
+//   slack.mts     the Slack transport             workflow.mts    what to do with an issue
+//                                                 watchtower.mts  the dashboard transport
 
-log(`Watching ${REPO} for open issues labelled "${LABEL}".`);
+log(`Watching ${tracker.source}.`);
 log(`Base ${BASE_BRANCH} · model ${MODEL} · polling every ${POLL_SECONDS}s · Ctrl-C to stop.`);
 log(`Slack notifications ${slackStatus}.`);
 log(`Pinging ${mentionStatus}.`);
@@ -90,17 +91,17 @@ log(`Watchtower ${watchtowerStatus}.`);
 // watcher does is commit them onto their branch. See rescueLeftovers in phases.mts.
 rescueLeftovers();
 
-// An issue wearing one of the state labels with no state file behind it is stuck:
-// its pull request is not being polled by anything. Say so once at startup rather
-// than leaving it silently parked forever.
+// An issue the tracker's mirror says the watcher is holding, with no state file
+// behind it, is stuck: its pull request is not being polled by anything. Say so
+// once at startup rather than leaving it silently parked forever.
 try {
-  const orphans = [AWAITING_LABEL, REVISION_LABEL]
-    .flatMap(labelledIssueNumbers)
-    .filter((number) => !existsSync(statePath(number)));
+  const orphans = tracker
+    .mirroredKeys()
+    .filter((key) => !existsSync(statePath(key)));
 
   if (orphans.length > 0) {
     log(
-      `WARNING: #${[...new Set(orphans)].join(", #")} carry a Sandcastle state label but have no ` +
+      `WARNING: ${[...new Set(orphans)].map(tracker.issueRef).join(", ")} carry a Sandcastle state label but have no ` +
         `state in .sandcastle/state/. Their pull requests are not being polled — merge or close ` +
         `them, or re-add the "${LABEL}" label to the issue to start over.`,
     );
@@ -147,7 +148,7 @@ while (!controller.signal.aborted) {
 
   let queue: Issue[];
   try {
-    queue = queuedIssues();
+    queue = tracker.queuedIssues();
   } catch (error) {
     log(`Poll failed, retrying in ${POLL_SECONDS}s: ${describe(error)}`);
     await sleep(POLL_SECONDS);
@@ -162,7 +163,7 @@ while (!controller.signal.aborted) {
   // Relabelling normally keeps a tracked issue out of this queue, but somebody
   // re-adding the label by hand should not start a second run against a branch
   // that already has one.
-  const fresh = queue.filter((issue) => !tracked.some((t) => t.issue.number === issue.number));
+  const fresh = queue.filter((issue) => !tracked.some((t) => t.issue.key === issue.key));
 
   if (fresh.length === 0) {
     await sleep(POLL_SECONDS);
@@ -171,7 +172,7 @@ while (!controller.signal.aborted) {
 
   const [issue, ...rest] = fresh;
   const waiting = tracked.length > 0 ? `, ${tracked.length} in flight` : "";
-  log(`#${issue.number} ${issue.title}${rest.length > 0 ? ` (${rest.length} more queued${waiting})` : waiting}`);
+  log(`${tracker.issueRef(issue.key)} ${issue.title}${rest.length > 0 ? ` (${rest.length} more queued${waiting})` : waiting}`);
 
   workingOn(issue);
   const started = await startIssue(issue, rest.length);

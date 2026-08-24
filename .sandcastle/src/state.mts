@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { STATE } from "./config.mts";
 import { describe, log } from "./shell.mts";
+import { compareIssueKeys } from "./tracker.mts";
 import type { Tracked } from "./types.mts";
 
 // The watcher's memory across restarts, in .sandcastle/state/. An issue can wait
@@ -13,14 +14,14 @@ import type { Tracked } from "./types.mts";
 // single agent at a time but tracks as many issues as have state here — see
 // docs/adr/0006-a-shipped-pull-request-still-listens.md.
 
-export const statePath = (issueNumber: number) => join(STATE, `issue-${issueNumber}.json`);
+export const statePath = (issueKey: string) => join(STATE, `issue-${issueKey}.json`);
 
 /**
  * Every tracked issue, oldest issue first, so the loop services them FIFO.
  *
- * Sorted by issue number rather than by filename: `issue-10.json` sorts before
- * `issue-2.json` as a string, which would make the queue newest-wins for any
- * repository that reaches double digits.
+ * Sorted by key with numeric-aware comparison rather than by filename:
+ * `issue-10.json` sorts before `issue-2.json` as a plain string, which would make
+ * the queue newest-wins for any repository that reaches double digits.
  *
  * Deliberately tolerant: an unreadable or malformed state file is renamed rather
  * than deleted, so a bug here cannot silently lose the only pointer to an open
@@ -47,12 +48,12 @@ export const loadTracked = (): Tracked[] => {
     }
   }
 
-  return tracked.sort((a, b) => a.issue.number - b.issue.number);
+  return tracked.sort((a, b) => compareIssueKeys(a.issue.key, b.issue.key));
 };
 
 export const saveTracked = (tracked: Tracked) => {
   mkdirSync(STATE, { recursive: true });
-  writeFileSync(statePath(tracked.issue.number), `${JSON.stringify(tracked, null, 2)}\n`);
+  writeFileSync(statePath(tracked.issue.key), `${JSON.stringify(tracked, null, 2)}\n`);
 };
 
-export const clearTracked = (issueNumber: number) => rmSync(statePath(issueNumber), { force: true });
+export const clearTracked = (issueKey: string) => rmSync(statePath(issueKey), { force: true });

@@ -160,8 +160,9 @@ did not happen.
 - **Change nothing on disk.** No edits, no new files, no commits, no branches, no pushes. This
   run is read-only and the worktree must be exactly as you found it. Anything you write here is
   thrown away, and a commit you make is stranded on a branch the host has already pushed.
-- **Do not comment on the pull request or the issue.** Reading with `gh` is fine. The host posts
-  your review for you.
+- **Do not comment on the pull request or the issue — you could not anyway.** This container
+  has no tracker credential, so `gh` cannot reach GitHub; everything you need is the diff, the
+  plan above and the code. The host posts your review for you.
 - **Do not run the gate**, do not install anything, do not start a dev server.
 - Do not print the value of any token or secret.
 
