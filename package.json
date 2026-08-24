@@ -16,7 +16,7 @@
     "e2e:standalone": "pnpm build:e2e && E2E_STANDALONE=true pnpm e2e",
     "sandcastle": "tsx .sandcastle/src/main.mts",
     "sandcastle:build-image": "sandcastle docker build-image --dockerfile .sandcastle/Dockerfile",
-    "sandcastle:jira-smoke": "tsx .sandcastle/src/jira-smoke.mts",
+    "sandcastle:jira-smoke": "SANDCASTLE_TRACKER=jira tsx .sandcastle/src/jira-smoke.mts",
     "sandcastle:smoke": "tsx .sandcastle/src/smoke.mts",
     "sandcastle:typecheck": "tsc --noEmit -p .sandcastle"
   },
