@@ -79,6 +79,11 @@ import type { Issue } from "./types.mts";
 //   slack.mts     the Slack transport             workflow.mts    what to do with an issue
 //                                                 watchtower.mts  the dashboard transport
 
+// Fail-fast: a tracker the watcher cannot authenticate against must end the
+// process with a message saying what to fix, not surface later as an empty
+// queue. A no-op on GitHub, where importing the forge already proved `gh`.
+await tracker.verify();
+
 log(`Watching ${tracker.source}.`);
 log(`Base ${BASE_BRANCH} · model ${MODEL} · polling every ${POLL_SECONDS}s · Ctrl-C to stop.`);
 log(`Slack notifications ${slackStatus}.`);
@@ -95,9 +100,7 @@ rescueLeftovers();
 // behind it, is stuck: its pull request is not being polled by anything. Say so
 // once at startup rather than leaving it silently parked forever.
 try {
-  const orphans = tracker
-    .mirroredKeys()
-    .filter((key) => !existsSync(statePath(key)));
+  const orphans = (await tracker.mirroredKeys()).filter((key) => !existsSync(statePath(key)));
 
   if (orphans.length > 0) {
     log(
@@ -148,7 +151,7 @@ while (!controller.signal.aborted) {
 
   let queue: Issue[];
   try {
-    queue = tracker.queuedIssues();
+    queue = await tracker.queuedIssues();
   } catch (error) {
     log(`Poll failed, retrying in ${POLL_SECONDS}s: ${describe(error)}`);
     await sleep(POLL_SECONDS);

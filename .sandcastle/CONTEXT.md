@@ -18,8 +18,8 @@ _Avoid_: ticket, task, story
 **Tracker**:
 Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
 text, the six lifecycle moments, the release comment, and both renderings of an issue's
-identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with GitHub as its first
-adapter. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
+identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with two adapters:
+GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
 
 **Forge**:

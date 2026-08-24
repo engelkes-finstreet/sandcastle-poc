@@ -1,4 +1,4 @@
-# Plan issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
+# Plan issue {{ISSUE_REF}}: {{ISSUE_TITLE}}
 
 You are an autonomous agent running inside a Sandcastle sandbox against **fs-fe-boilerplate**
 — a single-package Next.js 16 app (App Router, Panda CSS, next-intl, next-auth). No monorepo,

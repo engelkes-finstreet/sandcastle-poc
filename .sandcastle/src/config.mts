@@ -67,6 +67,24 @@ export const MODEL = process.env.SANDCASTLE_MODEL ?? "opus";
 export const TRACKER = process.env.SANDCASTLE_TRACKER ?? "github";
 
 /**
+ * The Jira adapter's configuration, read only when SANDCASTLE_TRACKER=jira —
+ * trackers/jira.mts validates the two credentials and exits loudly if they are
+ * missing or rejected.
+ *
+ * From the host shell, deliberately **never** from .sandcastle/.env: every key
+ * in that file is forwarded into the container, and no tracker credential may
+ * enter the sandbox — the same rule that retired GH_TOKEN. The token is a Jira
+ * Cloud personal API token (id.atlassian.com → Security → API tokens), used
+ * with the email as basic auth against the REST v3 API.
+ */
+export const JIRA_BASE_URL = (
+  process.env.JIRA_BASE_URL ?? "https://finstreet-team.atlassian.net"
+).replace(/\/+$/, "");
+export const JIRA_PROJECT = process.env.JIRA_PROJECT ?? "ESCB";
+export const JIRA_EMAIL = process.env.JIRA_EMAIL;
+export const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+
+/**
  * The code review runs on a cheaper model than the work it reviews, on purpose.
  * Reviewing is a bounded reading task against a diff that already compiles — the
  * skills carry the judgement, so the model mostly has to follow them carefully.

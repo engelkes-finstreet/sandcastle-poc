@@ -1,4 +1,4 @@
-# Implement the approved plan for issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
+# Implement the approved plan for issue {{ISSUE_REF}}: {{ISSUE_TITLE}}
 
 The plan you wrote was approved on pull request {{PR_URL}}. Implement it, verify it, commit it,
 and stop.
@@ -78,7 +78,7 @@ started. It is your only copy: this sandbox has no tracker credential.
    than working around it. `e2e/` is out of scope: it needs browsers this image does not have.
 5. **Commit.** One commit, or a few well-scoped ones, in the repo's conventional-commit style
    (`feat(scope): …`, `fix(scope): …`), referencing the issue in the body as
-   `Refs #{{ISSUE_NUMBER}}`.
+   `Refs {{ISSUE_REF}}`.
 
 ## `messages/de.po` will change under you
 

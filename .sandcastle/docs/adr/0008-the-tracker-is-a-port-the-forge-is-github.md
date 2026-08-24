@@ -23,9 +23,19 @@ upgrades without touching anything). The port is six operations:
 - **produce the external ref** — tracker type, key, URL: the issue's identity on the wire
 - **produce the commit reference** — how a key reads to a human: `#42` here, `ESCB-123` there
 
-plus two small port members the six imply: `mirroredKeys`, the read-back of the mirror `signal`
+plus the small members the six imply: `mirroredKeys`, the read-back of the mirror `signal`
 writes, which exists only so the startup orphan check can ask "what does the tracker think I am
-holding" — and `source`, the one line the startup banner prints about where work comes from.
+holding"; `source`, the one line the startup banner prints about where work comes from;
+`verify`, the fail-fast credential check run once at startup; and `planPullRequest`, the
+tracker-shaped parts of the plan pull request — its title and the reference line its body opens
+with — because which of those the tracker's tooling reads is tracker knowledge.
+
+*(Amended for the Jira adapter, #14.)* The port is asynchronous. The GitHub adapter never needs
+to be — `gh` is a blocking CLI — but a tracker spoken to over plain HTTP has no synchronous
+option, and the port's shape has to fit its widest implementor. Adapters are also selected as
+factories rather than instances, so only the chosen one is ever constructed: construction is
+where an adapter reads its own configuration, and a GitHub deployment must not fail over Jira
+credentials it never needed.
 
 The seam is real because both sides of it already existed. Issue identity was made an opaque
 string key first, and the host was already feeding issue text into the prompts — so the port
@@ -91,7 +101,10 @@ a dashboard that is deliberately optional.
   prose. The watcher still composes its release comments, its orphan warning and a handful of
   messages in GitHub's vocabulary ("re-add the **Sandcastle** label"), above the port — kept
   there because this refactor's acceptance bar was byte-for-byte equivalence, not neutral
-  wording. Moving that prose behind the port is the second adapter's first job.
+  wording. The second adapter (Jira, #14) shipped labels-first without paying this down: it
+  posts the watcher's prose as plain text, where GitHub markdown renders as literal asterisks —
+  legible, not pretty. Moving that prose behind the port is still open, and still the first
+  thing to reach for when the wording starts to matter.
 - **`SANDCASTLE_TRACKER` is validated, not trusted.** A typo is a loud startup failure, because
   a watcher silently falling back to GitHub against a queue that lives elsewhere would look
   exactly like a watcher with nothing to do.

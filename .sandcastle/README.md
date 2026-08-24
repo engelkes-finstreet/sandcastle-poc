@@ -88,6 +88,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `phases.mts` | the agent runs, and how a container is configured for them |
 | `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
 | `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
+| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, plus the comments GitHub's `Closes` clause makes unnecessary there — see below |
 | `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
@@ -263,12 +264,49 @@ Environment variables, all optional:
 | | Default | |
 |---|---|---|
 | `SANDCASTLE_BASE` | `origin/main` | what branches are cut from, and what PRs target |
-| `SANDCASTLE_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state. `github` is the only one so far; anything else refuses to start |
+| `SANDCASTLE_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state: `github` or `jira`. Anything else refuses to start |
 | `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
+| `JIRA_BASE_URL` | `https://finstreet-team.atlassian.net` | the Jira Cloud site, when the tracker is `jira` |
+| `JIRA_PROJECT` | `ESCB` | the Jira project whose issues feed the factory |
+| `JIRA_EMAIL`, `JIRA_API_TOKEN` | — | Jira credentials, **host shell only — never `.sandcastle/.env`**. See below |
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `.env` |
 | `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `.env` |
+
+### Jira as the tracker
+
+`SANDCASTLE_TRACKER=jira` points the *intake* at Jira; everything else stays exactly where it
+was. A team member labels an ESCB issue **`Sandcastle`** in Jira, the watcher finds it by JQL
+(`project = ESCB AND labels = Sandcastle AND statusCategory != Done`, oldest first), and from
+there the life is the one described above — the branch, the plan pull request,
+`approve`/`revise`/`abandon`, the merge — all on GitHub. The issue's summary, description and
+comments are flattened out of Jira's document format and injected into the prompts as
+`{{ISSUE_TEXT}}`, same as GitHub issue text is.
+
+What Jira sees back is deliberately thin — links and state, never prose:
+
+- the same three labels the GitHub adapter uses (`Sandcastle`, `Sandcastle:awaiting-approval`,
+  `Sandcastle:awaiting-revision`), swapped at the same moments. Jira creates a label the first
+  time it is added, so there is no ensure-labels step;
+- one comment with the pull request link when the plan is posted;
+- one comment when the pull request merges (Jira has no `Closes` clause, so the `shipped`
+  moment does the closing work a GitHub issue gets for free) or when the watcher stops
+  tracking the issue, and the trigger label comes off with it.
+
+Branch names, pull request titles and commit refs carry the key bare — `ESCB-123`, never
+`#ESCB-123` — which is what Jira's development panel matches, so the branch and pull request
+appear on the issue with no factory-side integration at all.
+
+**Credentials: `JIRA_EMAIL` and `JIRA_API_TOKEN`, from the host shell — never from
+`.sandcastle/.env`.** Every key in that file is forwarded into the container, and no tracker
+credential may enter the sandbox; the smoke test asserts their absence, the same way it does
+`GH_TOKEN`'s. Mint the token at id.atlassian.com → Security → API tokens (it authenticates as
+you; a service account is a recorded follow-up). With Jira selected and either credential
+missing or rejected, the watcher refuses to start and says what to fix.
+
+Jira workflow *transitions* are not wired yet — the labels are the whole mirror. That is #15,
+the transition map.
 
 ## Outcomes
 

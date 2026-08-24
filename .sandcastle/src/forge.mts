@@ -1,5 +1,7 @@
 import { ABANDONS, APPROVES, BOT_MARKER, LABEL, PR_BASE, REVISES } from "./config.mts";
 import { capture, describe, gh, git, log } from "./shell.mts";
+// Type-only, so the tracker → adapter → forge import chain stays acyclic at runtime.
+import type { PlanPrParts } from "./tracker.mts";
 import type { Decision, PlanDraft, Reviewed, Said, Tracked } from "./types.mts";
 
 // The forge: everything pull-request-shaped. The branch push, the draft pull
@@ -57,15 +59,17 @@ const HOW_TO_REVIEW = [
 ].join("\n");
 
 /**
- * `issueRef` is the tracker's rendering of the issue key — `#42` here, `ESCB-123`
- * on another tracker — supplied by the caller rather than assumed, because the
- * forge does not know which tracker minted the key. On a GitHub-tracked project
- * the `Closes` clause is also what closes the issue on merge, which is why the
- * tracker's `shipped` moment can be a no-op there.
+ * What the tracker dictates about the plan pull request, supplied by the caller
+ * because the forge does not know which tracker minted the key: the port's
+ * PlanPrParts, plus `commitRef` — the port's `issueRef` — for the plan commit's
+ * message. On GitHub the ref line is the `Closes` clause that closes the issue
+ * on merge, which is why that tracker's `shipped` moment can be a no-op.
  */
-export const planBody = (pending: PlanDraft, issueRef: string) =>
+export type PlanDress = PlanPrParts & { readonly commitRef: string };
+
+export const planBody = (pending: PlanDraft, refLine: string) =>
   [
-    `Closes ${issueRef}`,
+    refLine,
     "",
     "## Plan",
     "",
@@ -87,13 +91,13 @@ export const planBody = (pending: PlanDraft, issueRef: string) =>
  * It survives as the first commit of the pull request, which is a fair record of
  * how the branch started; a squash merge drops it entirely.
  */
-const emptyPlanCommit = (title: string, issueRef: string, branch: string) => {
+const emptyPlanCommit = (title: string, commitRef: string, branch: string) => {
   const tree = git("rev-parse", `${branch}^{tree}`);
   const parent = git("rev-parse", branch);
   const sha = capture("git", [
     "commit-tree", tree,
     "-p", parent,
-    "-m", `plan(${issueRef}): ${title}`,
+    "-m", `plan(${commitRef}): ${title}`,
   ]);
   git("update-ref", `refs/heads/${branch}`, sha, parent);
 };
@@ -101,9 +105,9 @@ const emptyPlanCommit = (title: string, issueRef: string, branch: string) => {
 /** Opens the draft pull request that carries the plan, and returns it. */
 export const openPlanPullRequest = (
   draft: PlanDraft,
-  issueRef: string,
+  dress: PlanDress,
 ): { url: string; number: number } => {
-  emptyPlanCommit(draft.issue.title, issueRef, draft.branch);
+  emptyPlanCommit(draft.issue.title, dress.commitRef, draft.branch);
   git("push", "--set-upstream", "origin", draft.branch);
 
   const existing = JSON.parse(
@@ -112,7 +116,7 @@ export const openPlanPullRequest = (
 
   if (existing.length > 0) {
     const found = existing[0];
-    gh("pr", "edit", String(found.number), "--body", planBody(draft, issueRef));
+    gh("pr", "edit", String(found.number), "--body", planBody(draft, dress.refLine));
     return found;
   }
 
@@ -121,8 +125,8 @@ export const openPlanPullRequest = (
     "--draft",
     "--base", PR_BASE,
     "--head", draft.branch,
-    "--title", `${draft.issue.title} (plan)`,
-    "--body", planBody(draft, issueRef),
+    "--title", dress.title,
+    "--body", planBody(draft, dress.refLine),
   );
   const url = output.split("\n").filter(Boolean).pop() ?? "";
   const { number } = JSON.parse(gh("pr", "view", url, "--json", "number")) as { number: number };

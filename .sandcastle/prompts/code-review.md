@@ -1,4 +1,4 @@
-# Review the code written for issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
+# Review the code written for issue {{ISSUE_REF}}: {{ISSUE_TITLE}}
 
 Another agent planned this work, a human approved the plan, and a third run implemented it. You
 are none of those. This is a fresh session on purpose — the agent that wrote this code would

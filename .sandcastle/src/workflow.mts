@@ -51,8 +51,12 @@ import type {
 const now = () => new Date().toISOString();
 
 /** Stop tracking an issue, and let the tracker take its mark off with it. */
-const forget = (tracked: Tracked) => {
-  tracker.signal(tracked.issue, { type: "stopped", from: tracked.status });
+const forget = async (tracked: Tracked) => {
+  await tracker.signal(tracked.issue, {
+    type: "stopped",
+    from: tracked.status,
+    prUrl: tracked.prUrl,
+  });
   clearTracked(tracked.issue.key);
 };
 
@@ -62,7 +66,7 @@ const forget = (tracked: Tracked) => {
 export const startIssue = async (issue: Issue, queued: number): Promise<boolean> => {
   // A no-op on GitHub, where nothing marks a pickup — but the moment belongs to
   // the lifecycle, and a tracker that can say "in progress" says it here.
-  tracker.signal(issue, { type: "picked-up" });
+  await tracker.signal(issue, { type: "picked-up" });
 
   // Announced before any work starts, so the channel shows the issue was picked
   // up rather than going quiet for the minutes the agent takes. If this post
@@ -81,7 +85,7 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
     }
     const detail = describe(error);
     log(`  ${tracker.issueRef(issue.key)} failed to plan: ${detail}`);
-    const posted = tracker.release(
+    const posted = await tracker.release(
       issue,
       `🏖️ The Sandcastle agent could not produce a plan for this issue:\n\n` +
         "```\n" + detail + "\n```\n\n" +
@@ -94,7 +98,7 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
   if (planned.plan.startsWith(PLAN_BLOCKED)) {
     const why = planned.plan.slice(PLAN_BLOCKED.length).trim();
     log(`  ${tracker.issueRef(issue.key)} → blocked at planning`);
-    const posted = tracker.release(
+    const posted = await tracker.release(
       issue,
       `🏖️ The Sandcastle agent read this issue and could not plan it:\n\n${why}\n\n` +
         `Nothing was implemented and no pull request was opened. Re-add the **${LABEL}** label once ` +
@@ -115,10 +119,13 @@ export const startIssue = async (issue: Issue, queued: number): Promise<boolean>
     repliedThrough: stamp,
   };
 
-  const pr = openPlanPullRequest(draft, tracker.issueRef(issue.key));
+  const pr = openPlanPullRequest(draft, {
+    ...tracker.planPullRequest(issue),
+    commitRef: tracker.issueRef(issue.key),
+  });
   saveTracked({ ...draft, prUrl: pr.url, prNumber: pr.number });
 
-  tracker.signal(issue, { type: "awaiting-approval" });
+  await tracker.signal(issue, { type: "awaiting-approval", prUrl: pr.url });
 
   log(`  plan posted to ${pr.url} — waiting for a review comment`);
   await announcePlanPosted(issue, pr, planned.branch, planned.plan, thread.ts);
@@ -144,9 +151,9 @@ const gone = async (tracked: Tracked, state: string) => {
   // below says to re-plan — an issue whose tracker was just told "shipped" is
   // not one anybody would re-plan.
   if (tracked.status === "awaiting-revision" && state === "MERGED") {
-    tracker.signal(tracked.issue, { type: "shipped" });
+    await tracker.signal(tracked.issue, { type: "shipped", prUrl: tracked.prUrl });
   }
-  forget(tracked);
+  await forget(tracked);
   if (tracked.status === "awaiting-plan") await announcePlanGone(tracked, state);
   else await announceFinished(tracked, state);
 };
@@ -162,7 +169,7 @@ const abandon = async (tracked: Tracked, decision: Reviewed) => {
           `on further comments here. The code that shipped is untouched: merge it, close it, or carry ` +
           `on with it yourself.`,
   );
-  forget(tracked);
+  await forget(tracked);
   await announceAbandoned(tracked, decision);
 };
 
@@ -205,7 +212,7 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
   log(`  ${tracker.issueRef(tracked.issue.key)} approved by ${decision.author}`);
   // A no-op on GitHub, which never marked an implementation starting; a tracker
   // with an "in progress" of its own moves the issue there now.
-  tracker.signal(tracked.issue, { type: "implementing" });
+  await tracker.signal(tracked.issue, { type: "implementing" });
   await announceApproved(tracked, decision);
 
   let attempt: Attempt;
@@ -231,7 +238,7 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
   // Only shipped code is worth keeping an eye on. Everything else has already said
   // why on the pull request, and the issue goes back to needing a human.
   if (!attempt.pullRequest) {
-    forget(tracked);
+    await forget(tracked);
     const post = await announceAttempt(tracked, attempt, posted);
     if (post.error) log(`  WARNING: Slack notification failed: ${post.error}`);
     return "worked";
@@ -250,7 +257,7 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
     repliedThrough: decision.at,
   };
   saveTracked(shipped);
-  tracker.signal(tracked.issue, { type: "awaiting-revision" });
+  await tracker.signal(tracked.issue, { type: "awaiting-revision" });
 
   const post = await announceAttempt(shipped, attempt, posted);
   if (post.error) log(`  WARNING: Slack notification failed: ${post.error}`);
@@ -341,7 +348,7 @@ const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promis
   if (tracked.revisionRounds >= MAX_REVISION_ROUNDS) {
     log(`  ${tracker.issueRef(tracked.issue.key)} has spent all ${MAX_REVISION_ROUNDS} follow-up rounds — letting go`);
     const posted = commentOnPr(tracked.prNumber, ROUNDS_SPENT);
-    forget(tracked);
+    await forget(tracked);
     await announceRoundsSpent(tracked, posted);
     return "worked";
   }
@@ -394,7 +401,7 @@ const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promis
 
   // On the spent path the clocks above are moot — there is no next run to hand
   // anything to, and the state file goes with the label.
-  if (spent) forget(after);
+  if (spent) await forget(after);
   else saveTracked(after);
 
   const post = await announceFollowUp(tracked, attempt, posted);
