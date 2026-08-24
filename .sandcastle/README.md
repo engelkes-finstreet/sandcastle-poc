@@ -101,6 +101,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `slack.mts` | the transport: `chat.postMessage` over a bot token |
 | `watchtower.mts` | the other transport: the dashboard's event emitter, the identifiers, and the heartbeat |
 | `smoke.mts` | the health check — `pnpm sandcastle:smoke` |
+| `jira-smoke.mts` | the other health check — `pnpm sandcastle:jira-smoke`, the host's half: credentials, project, newest issue |
 
 ### `prompts/` — one per run
 
@@ -387,12 +388,35 @@ export JIRA_EMAIL="you@finstreet.de"
 export JIRA_API_TOKEN="…"          # id.atlassian.com → Security → API tokens
 ```
 
-Prove them before involving the watcher — this is the same call `verify()` makes:
+Then prove them before involving the watcher at all:
 
 ```bash
-curl -su "$JIRA_EMAIL:$JIRA_API_TOKEN" \
-  https://finstreet-team.atlassian.net/rest/api/3/myself | jq .displayName
+pnpm sandcastle:jira-smoke
 ```
+
+Three questions in the order they can fail — are the credentials accepted, is `JIRA_PROJECT`
+visible to that account, and does a real issue come back — and the third one prints the newest
+issue in the project, because a key and a summary you recognise is what tells you it is the
+*right* project rather than *a* project:
+
+```
+[…] Jira smoke test — https://finstreet-team.atlassian.net, project ESCB
+[…]   1/3  credentials   authenticated as … <…@finstreet.de>
+[…]   2/3  project       ESCB — "…" (software), lead …
+[…]   3/3  newest issue  ESCB-128 — …
+
+       status    To Do
+       created   2026-08-24 18:02 by …
+       labels    Sandcastle
+       url       https://finstreet-team.atlassian.net/browse/ESCB-128
+
+[…] Jira is reachable, and ESCB is the project the watcher would take work from.
+```
+
+Every step is a GET, so it is safe against the production site and safe to re-run while you sort
+a token out. Whichever step fails says what to fix — a rejected token, a project the account
+cannot browse, a site that is not Jira Cloud. It is the host's half of `pnpm sandcastle:smoke`,
+which checks the *container*, where these credentials deliberately do not exist.
 
 **2. Learn the transition names from the issue itself.** Names, not board columns: the button
 says *Start work* where the column says *In Progress*, and the map wants the button.

@@ -46,8 +46,17 @@ import type { Issue, Tracked } from "../types.mts";
  * the credentials — and 4xx bodies are included because Jira puts the actual
  * reason there ("The issue no longer exists", a JQL parse error) while the
  * status line says only 400.
+ *
+ * Exported for the Jira smoke test, which is the one other thing that talks to
+ * this site and should reach it through the same door — same headers, same error
+ * text — so that what it proves is what the watcher will do.
  */
-const api = async (auth: string, method: string, path: string, body?: unknown): Promise<unknown> => {
+export const jiraApi = async (
+  auth: string,
+  method: string,
+  path: string,
+  body?: unknown,
+): Promise<unknown> => {
   const response = await fetch(`${JIRA_BASE_URL}${path}`, {
     method,
     headers: {
@@ -288,23 +297,32 @@ const readTransitionMap = (): TransitionMap => {
 
 // ---------------------------------------------------------------- adapter
 
-export const jiraTracker = (): Tracker => {
-  // The missing-credentials half of the fail-fast contract, checked at
-  // construction; `verify` below covers rejected ones with a real call.
+/**
+ * The missing-credentials half of the fail-fast contract: the configured
+ * credentials as an `Authorization` value, or a loud exit naming what is absent.
+ * (`verify` on the adapter covers *rejected* credentials, with a real call.)
+ *
+ * Exported for the same reason `jiraApi` is: the smoke test must refuse to start
+ * for the same reason and with the same words the watcher would.
+ */
+export const jiraCredentials = (): { email: string; auth: string } => {
   const email = JIRA_EMAIL;
   const token = JIRA_API_TOKEN;
   if (!email || !token) {
     console.error(
-      `SANDCASTLE_TRACKER=jira needs JIRA_EMAIL and JIRA_API_TOKEN in the host environment ` +
+      `Talking to Jira needs JIRA_EMAIL and JIRA_API_TOKEN in the host environment ` +
         `(missing: ${[!email && "JIRA_EMAIL", !token && "JIRA_API_TOKEN"].filter(Boolean).join(", ")}).\n` +
         `Mint a personal API token at id.atlassian.com → Security → API tokens. Do not put either ` +
         `into .sandcastle/.env — every key there is forwarded into the container.`,
     );
     process.exit(1);
   }
+  return { email, auth: Buffer.from(`${email}:${token}`).toString("base64") };
+};
 
-  const auth = Buffer.from(`${email}:${token}`).toString("base64");
-  const call = (method: string, path: string, body?: unknown) => api(auth, method, path, body);
+export const jiraTracker = (): Tracker => {
+  const { email, auth } = jiraCredentials();
+  const call = (method: string, path: string, body?: unknown) => jiraApi(auth, method, path, body);
 
   // Read here for the same reason the credentials are: construction is where an
   // adapter reads its own configuration, so a GitHub deployment never opens this
