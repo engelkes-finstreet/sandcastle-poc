@@ -1,3 +1,8 @@
+// First, for its side effect: this module is what both container-launching entry
+// points go through, and starting a container is the exact moment a host-side key
+// left in .sandcastle/.env would be forwarded. env.mts refuses to let that run.
+// smoke.mts reaches the guard only through here — it imports no config.
+import "./env.mts";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";

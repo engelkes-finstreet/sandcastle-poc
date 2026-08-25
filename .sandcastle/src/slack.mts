@@ -1,5 +1,7 @@
-import { existsSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+// For its side effect, and first: this module reads process.env at module scope
+// and does not import config.mts, so it has to fill the environment itself.
+// Idempotent — the ESM cache means only the first importer runs it.
+import "./env.mts";
 
 // Slack notifications for the watcher, over a bot token rather than an incoming
 // webhook. A webhook URL is welded to one channel; a token posts wherever the bot
@@ -8,7 +10,7 @@ import { fileURLToPath } from "node:url";
 // original message's thread instead of as a second post in the channel.
 //
 // Setup: create a Slack app, give it the `chat:write` bot scope, install it, and
-// invite it to the channel. Then in .sandcastle/.env (gitignored):
+// invite it to the channel. Then in .sandcastle/host.env (gitignored):
 //
 //   SLACK_BOT_TOKEN=xoxb-...
 //   SLACK_CHANNEL=C0123456789
@@ -16,32 +18,21 @@ import { fileURLToPath } from "node:url";
 //
 // Any of them can come from the shell instead, which takes precedence.
 //
+// host.env rather than .sandcastle/.env, and per-checkout rather than in a shell
+// profile, for the same reason: this transport is the host's, and two golems on
+// one machine post to two different channels.
+//
 // Notifications are best-effort. A watcher that dies because Slack had a bad
 // minute would be worse than one that misses a ping.
 
-const ENV_FILE = fileURLToPath(new URL("../.env", import.meta.url));
-
-/**
- * Read a single key out of .sandcastle/.env rather than loading the file.
- *
- * That file holds the sandbox's credentials, and loading all of it into the
- * host process would let one of them shadow a host credential — the `git push`
- * and `gh pr create` in main.mts run on your own gh login, and a stray token
- * from the env file must not be able to take their place.
- */
-const readEnvKey = (key: string) => {
-  if (!existsSync(ENV_FILE)) return undefined;
-  for (const line of readFileSync(ENV_FILE, "utf8").split("\n")) {
-    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (match?.[1] !== key) continue;
-    return match[2].trim().replace(/^["']|["']$/g, "") || undefined;
-  }
-  return undefined;
-};
-
-const TOKEN = process.env.SLACK_BOT_TOKEN ?? readEnvKey("SLACK_BOT_TOKEN");
-const CHANNEL = process.env.SLACK_CHANNEL ?? readEnvKey("SLACK_CHANNEL");
-const MENTION_RAW = process.env.SLACK_MENTION ?? readEnvKey("SLACK_MENTION");
+// Plain process.env now that env.mts has run. The hand-rolled single-key reader
+// this replaces existed to avoid loading the *sandbox's* file into the host
+// process, where one of its credentials could have shadowed the `gh` login that
+// `git push` and `gh pr create` run on. host.env cannot hold one: env.mts refuses
+// to start if a sandbox credential is listed there.
+const TOKEN = process.env.SLACK_BOT_TOKEN;
+const CHANNEL = process.env.SLACK_CHANNEL;
+const MENTION_RAW = process.env.SLACK_MENTION;
 
 /**
  * Turn whatever is in SLACK_MENTION into something Slack will actually notify on.
@@ -74,7 +65,7 @@ export const slackStatus = TOKEN
     : "off — SLACK_BOT_TOKEN is set but SLACK_CHANNEL is missing"
   : CHANNEL
     ? "off — SLACK_CHANNEL is set but SLACK_BOT_TOKEN is missing"
-    : "off — set SLACK_BOT_TOKEN and SLACK_CHANNEL in .sandcastle/.env to get pinged";
+    : "off — set SLACK_BOT_TOKEN and SLACK_CHANNEL in .sandcastle/host.env to get pinged";
 
 /**
  * Who gets pinged, reported at startup next to `slackStatus` for the same reason:

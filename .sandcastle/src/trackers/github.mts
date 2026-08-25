@@ -155,17 +155,31 @@ const release = (issue: Issue, comment: string): string | undefined => {
   }
 };
 
-export const githubTracker: Tracker = {
+/**
+ * Async to fit the port, synchronous underneath: every read and write here is a
+ * blocking `gh` call, which is also why `verify` has nothing left to do — the
+ * forge's REPO lookup already proved the credential the moment this module was
+ * imported, and it would be this adapter's check too.
+ */
+export const githubTracker = (): Tracker => ({
   source: `${REPO} for open issues labelled "${LABEL}"`,
+  verify: async () => {},
   issueRef,
   externalRef: (issue) => ({
     trackerType: "github",
     externalKey: issue.key,
     url: issueUrl(issue.key),
   }),
-  queuedIssues,
-  issueText,
-  signal,
-  release,
-  mirroredKeys: () => [AWAITING_LABEL, REVISION_LABEL].flatMap(labelledIssueKeys),
-};
+  // The title carries no key — the `Closes` clause links (and later closes) the
+  // issue, so GitHub needs nothing more, and this is the shape every plan pull
+  // request has had since before the port existed.
+  planPullRequest: (issue) => ({
+    title: `${issue.title} (plan)`,
+    refLine: `Closes ${issueRef(issue.key)}`,
+  }),
+  queuedIssues: async () => queuedIssues(),
+  issueText: async (key) => issueText(key),
+  signal: async (issue, moment) => signal(issue, moment),
+  release: async (issue, comment) => release(issue, comment),
+  mirroredKeys: async () => [AWAITING_LABEL, REVISION_LABEL].flatMap(labelledIssueKeys),
+});

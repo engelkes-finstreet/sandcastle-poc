@@ -18,9 +18,48 @@ _Avoid_: ticket, task, story
 **Tracker**:
 Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
 text, the six lifecycle moments, the release comment, and both renderings of an issue's
-identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with GitHub as its first
-adapter. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
+identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with two adapters:
+GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
+
+**Moment**:
+One of the six points in an issue's life the watcher tells its tracker about — picked-up,
+awaiting-approval, implementing, awaiting-revision, shipped, stopped. Fixed by the watcher; each
+adapter is free only in *how* it says one, and saying nothing is a legitimate way.
+_Avoid_: event, hook, state — the first two suggest something subscribable, and the states are
+the watcher's own (`Tracked["status"]`), which is a shorter list
+
+**Transition map**:
+`jira-transitions.json`: the committed, per-project file naming which Jira transition each moment
+fires. Optional entry by entry and absent by default, so the Jira mirror is labels-first until a
+team fills it in. Only the Jira adapter has one.
+_Avoid_: workflow config — the workflow is Jira's, and the map only names moves inside it
+
+**Flow**:
+One issue type's workflow, as the transition map sees it: the moments named under `"Sub-task"`, or
+under `"*"` for every type not named. A Jira workflow scheme binds a workflow per issue type, so
+ESCB has two — they use the same words for the two buttons the map fills in today, so the committed
+file is the flat single-flow shape, and they diverge after In CodeReview, which is where a flow per
+type will be needed. Which flow a moment uses is decided by the type of the issue it lands on,
+which for a scoped story is the subtask's, not the story's.
+_Avoid_: workflow (Jira's word for the whole graph, of which a flow is only the moments we name),
+map per type (there is one map file; a flow is a section of it)
+
+**Subtask rule**:
+`jira-subtasks.json`: the committed, per-*repository* file saying which of a story's subtasks this
+golem implements — `mine` to work, `others` to leave alone, matched against subtask summaries. A
+sibling of the transition map, answering a different question: the map is about which board column
+a moment moves, this is about which half of a story is ours at all. Only the Jira adapter has one.
+_Avoid_: calling it a filter — it also composes what the prompt is told, not just what is queued
+
+**Scope**:
+What one labelled issue's work turns out to be, once the subtask rule is applied: the issue itself,
+some of its subtasks, or another repository's (in which case this golem leaves the issue alone with
+its label on). It narrows the *prompt* and the workflow transitions, never the issue's identity —
+the branch, the state file, the pull request and the label swap stay on the labelled issue. See
+`0010-a-golem-takes-its-own-slice-of-a-story.md`.
+_Avoid_: using it for how large a plan is allowed to be, which is the prompts' word for something
+else
 
 **Forge**:
 Where the code changes go: branches, the plan pull request, trigger-word comments,

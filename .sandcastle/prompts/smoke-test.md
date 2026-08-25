@@ -22,7 +22,7 @@ about where you are.
 - Toolchain: !`node --version; git --version; (claude --version || true); (pnpm --version || echo "pnpm: not installed"); (jq --version || true)`
 - Registry config: !`cat .npmrc 2>&1 || echo ".npmrc: MISSING"`
 - Credentials reaching the container (names only): !`env | grep -oE '^(NPM_AUTH_TOKEN|CLAUDE_CODE_OAUTH_TOKEN|SLACK_BOT_TOKEN|FINSTREET_MCP_TOKEN)=' | sed 's/=$/: set/' || echo "none set"`
-- Tracker credential (expected absent — the host feeds issue text into the prompts): !`env | grep -q '^GH_TOKEN=' && echo "GH_TOKEN: SET, and it should not be" || echo "GH_TOKEN: absent, as designed"`
+- Tracker credentials (expected absent — the host feeds issue text into the prompts): !`for key in GH_TOKEN JIRA_API_TOKEN JIRA_EMAIL; do env | grep -q "^$key=" && echo "$key: SET, and it should not be" || echo "$key: absent, as designed"; done`
 - Installed packages: !`ls node_modules/.pnpm 2>/dev/null | wc -l`
 - Native binaries: !`ls node_modules/.pnpm 2>/dev/null | grep -ciE "linux" | sed 's/^/linux: /'; ls node_modules/.pnpm 2>/dev/null | grep -ciE "darwin" | sed 's/^/darwin: /'`
 

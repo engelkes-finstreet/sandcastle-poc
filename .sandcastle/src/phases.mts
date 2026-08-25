@@ -288,7 +288,7 @@ export const planIssue = async (issue: Issue): Promise<Planned> => {
     promptFile: PLAN_PROMPT,
     // The issue's text arrives as ISSUE_TEXT, fetched on the host — the container
     // has no tracker credential to read it itself.
-    promptArgs: issuePromptArgs(issue),
+    promptArgs: await issuePromptArgs(issue),
     output: Output.string({ tag: PLAN_TAG }),
   });
 
@@ -349,7 +349,7 @@ export const implementPlan = async (tracked: Tracked, approval: string): Promise
     name: `issue-${issue.key}-implement`,
     promptFile: IMPLEMENT_PROMPT,
     promptArgs: {
-      ...issuePromptArgs(issue),
+      ...(await issuePromptArgs(issue)),
       PR_URL: prUrl,
       PLAN: tracked.plan,
       APPROVAL: approval,
@@ -456,7 +456,7 @@ export const reviewCode = async (tracked: Tracked): Promise<CodeReview | undefin
     name: `issue-${issue.key}-code-review`,
     promptFile: CODE_REVIEW_PROMPT,
     promptArgs: {
-      ISSUE_NUMBER: issue.key,
+      ISSUE_REF: tracker.issueRef(issue.key),
       ISSUE_TITLE: issue.title,
       PLAN: tracked.plan,
       BASE: BASE_BRANCH,
@@ -534,7 +534,7 @@ export const followUp = async (
     name: `issue-${issue.key}-follow-up-${round}`,
     promptFile: FOLLOW_UP_PROMPT,
     promptArgs: {
-      ...issuePromptArgs(issue),
+      ...(await issuePromptArgs(issue)),
       PR_URL: prUrl,
       PLAN: tracked.plan,
       REQUEST: changeRequestText(request),

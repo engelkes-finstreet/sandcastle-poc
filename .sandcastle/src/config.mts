@@ -1,9 +1,15 @@
+// First, and for its side effect: env.mts fills process.env from
+// .sandcastle/host.env before any of the reads below happen, and refuses to let
+// the process start if a host-only key has been left in the sandbox's .env. See
+// that file for the two-file rule and why the names are what they are.
+import "./env.mts";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Every knob the watcher has, and every path it touches. Imported by all the
-// other modules; imports nothing but node builtins itself, so it stays the one
-// file you can read to know how a run is configured.
+// other modules; imports nothing but node builtins and env.mts itself, so it
+// stays the one file you can read to know how a run is configured — with
+// host.env as the other half of the answer to where a value came from.
 
 export const LABEL = "Sandcastle";
 export const AWAITING_LABEL = "Sandcastle:awaiting-approval";
@@ -67,6 +73,25 @@ export const MODEL = process.env.SANDCASTLE_MODEL ?? "opus";
 export const TRACKER = process.env.SANDCASTLE_TRACKER ?? "github";
 
 /**
+ * The Jira adapter's configuration, read only when SANDCASTLE_TRACKER=jira —
+ * trackers/jira.mts validates the two credentials and exits loudly if they are
+ * missing or rejected.
+ *
+ * From .sandcastle/host.env or the shell, deliberately **never** from
+ * .sandcastle/.env: every key in that file is forwarded into the container, and
+ * no tracker credential may enter the sandbox — the same rule that retired
+ * GH_TOKEN, and the one env.mts refuses to start without. The token is a Jira
+ * Cloud personal API token (id.atlassian.com → Security → API tokens), used
+ * with the email as basic auth against the REST v3 API.
+ */
+export const JIRA_BASE_URL = (
+  process.env.JIRA_BASE_URL ?? "https://finstreet-team.atlassian.net"
+).replace(/\/+$/, "");
+export const JIRA_PROJECT = process.env.JIRA_PROJECT ?? "ESCB";
+export const JIRA_EMAIL = process.env.JIRA_EMAIL;
+export const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
+
+/**
  * The code review runs on a cheaper model than the work it reviews, on purpose.
  * Reviewing is a bounded reading task against a diff that already compiles — the
  * skills carry the judgement, so the model mostly has to follow them carefully.
@@ -106,6 +131,37 @@ export const CODE_REVIEW_PROMPT = prompt("code-review.md");
 export const WORKTREES = join(SANDCASTLE, "worktrees");
 export const LOGS = join(SANDCASTLE, "logs");
 export const STATE = join(SANDCASTLE, "state");
+
+/**
+ * The Jira transition map: lifecycle moment → the name of the Jira transition
+ * that moment should fire, read only when SANDCASTLE_TRACKER=jira. Committed
+ * rather than configured by environment, because which transitions a project's
+ * workflow offers is a property of the project, not of the shell that starts the
+ * watcher — and because filling it in should be a reviewable one-file change.
+ * Absent, or with every moment left empty, the Jira mirror is labels only.
+ * trackers/jira.mts is what reads and validates it.
+ */
+const JIRA_TRANSITIONS_FILE = "jira-transitions.json";
+export const JIRA_TRANSITIONS = join(SANDCASTLE, JIRA_TRANSITIONS_FILE);
+
+/** The same path as a human would quote it, for the messages that name the file. */
+export const JIRA_TRANSITIONS_REF = `.sandcastle/${JIRA_TRANSITIONS_FILE}`;
+
+/**
+ * The Jira subtask rule: which of a story's subtasks is *this* repository's work,
+ * read only when SANDCASTLE_TRACKER=jira. Committed for the same reason the
+ * transition map is, and one step more so: which discipline a golem implements is
+ * a property of the repository it is pointed at — the frontend golem takes the
+ * `[FE]` subtask and no other — and a repository's own file is the only place
+ * that fact cannot drift away from the code it describes. Absent, or with no
+ * discipline named, every run is scoped to the labelled issue itself, exactly as
+ * it was before this existed. trackers/jira.mts is what reads and validates it.
+ */
+const JIRA_SUBTASKS_FILE = "jira-subtasks.json";
+export const JIRA_SUBTASKS = join(SANDCASTLE, JIRA_SUBTASKS_FILE);
+
+/** The same path as a human would quote it. */
+export const JIRA_SUBTASKS_REF = `.sandcastle/${JIRA_SUBTASKS_FILE}`;
 
 /** The branch an issue is planned and implemented on. */
 export const branchFor = (issueKey: string) => `sandcastle/issue-${issueKey}`;

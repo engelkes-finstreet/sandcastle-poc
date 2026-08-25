@@ -1,4 +1,4 @@
-# Act on a change request for issue #{{ISSUE_NUMBER}}: {{ISSUE_TITLE}}
+# Act on a change request for issue {{ISSUE_REF}}: {{ISSUE_TITLE}}
 
 Code for this issue is already implemented, pushed, and open for review at {{PR_URL}}. A human has
 read it and asked for a change. Make that change, verify it, commit it, and stop.
@@ -50,6 +50,11 @@ committing once at the end.
 The issue's full text — body and every comment, oldest first — as it stood when this
 container started. It is your only copy: this sandbox has no tracker credential.
 
+If the text opens with a **Scope:** line, the issue is a story split into subtasks and only the
+subtask(s) named there are this repository's work. The sections marked *for context* — the story
+itself, and what the other subtasks cover — are there so what you do fits against work somebody
+else is doing. They are not yours to do.
+
 {{ISSUE_TEXT}}
 
 ## How to work
@@ -74,7 +79,7 @@ container started. It is your only copy: this sandbox has no tracker credential.
    All three must pass before you commit. Quote any failure you cannot legitimately fix rather than
    working around it. `e2e/` is out of scope: it needs browsers this image does not have.
 5. **Commit** in the repo's conventional-commit style, referencing the issue in the body as
-   `Refs #{{ISSUE_NUMBER}}`. Write the subject for someone reading the pull request's commit list
+   `Refs {{ISSUE_REF}}`. Write the subject for someone reading the pull request's commit list
    after having already reviewed it once — say what changed now, not what the feature is.
 
 ## `messages/de.po` will change under you

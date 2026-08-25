@@ -23,9 +23,19 @@ upgrades without touching anything). The port is six operations:
 - **produce the external ref** — tracker type, key, URL: the issue's identity on the wire
 - **produce the commit reference** — how a key reads to a human: `#42` here, `ESCB-123` there
 
-plus two small port members the six imply: `mirroredKeys`, the read-back of the mirror `signal`
+plus the small members the six imply: `mirroredKeys`, the read-back of the mirror `signal`
 writes, which exists only so the startup orphan check can ask "what does the tracker think I am
-holding" — and `source`, the one line the startup banner prints about where work comes from.
+holding"; `source`, the one line the startup banner prints about where work comes from;
+`verify`, the fail-fast credential check run once at startup; and `planPullRequest`, the
+tracker-shaped parts of the plan pull request — its title and the reference line its body opens
+with — because which of those the tracker's tooling reads is tracker knowledge.
+
+*(Amended for the Jira adapter, #14.)* The port is asynchronous. The GitHub adapter never needs
+to be — `gh` is a blocking CLI — but a tracker spoken to over plain HTTP has no synchronous
+option, and the port's shape has to fit its widest implementor. Adapters are also selected as
+factories rather than instances, so only the chosen one is ever constructed: construction is
+where an adapter reads its own configuration, and a GitHub deployment must not fail over Jira
+credentials it never needed.
 
 The seam is real because both sides of it already existed. Issue identity was made an opaque
 string key first, and the host was already feeding issue text into the prompts — so the port
@@ -42,6 +52,57 @@ pickup or an implementation starting, and `shipped` needs no hand because the pl
 request's `Closes` clause already closes the issue when it merges. A no-op is a fact about
 GitHub, not a gap in the port: a tracker with an "In Progress" of its own says it at those
 moments, and the watcher neither knows nor cares which kind it is talking to.
+
+*(Amended for the Jira transition map, #15.)* The Jira adapter is the tracker with an "In
+Progress" of its own, and how it says it stayed **out** of the port: which transition each of the
+six moments fires is declared in a committed per-project file,
+`.sandcastle/jira-transitions.json`, by transition *name*. Three things about that shape were
+deliberate. It is a file
+rather than environment variables, because which transitions a workflow offers is a property of
+the project and belongs in review, not in whoever's shell starts the watcher. It is names
+rather than ids, because an id is a per-workflow integer nobody can read. And nothing is
+resolved until the moment fires — Jira offers only the transitions the issue's current status
+allows, so there is no startup check to write, and a name the issue does not offer is a log line
+listing the ones it does. The unhappy paths all degrade the same way: what is unconfigured or
+unresolvable is skipped, and the labels — which every Jira project has, whatever its workflow —
+remain the mirror that has to work. The one thing that *is* loud is a misspelled moment key,
+because that would read as a factory ignoring the file.
+
+*(Amended again for one flow per issue type.)* One project turned out to have more than one
+workflow. A Jira workflow scheme binds a workflow **per issue type**: in ESCB a Sub-task runs
+`To Do → In Progress → In CodeReview → Done`, while the Story above it carries on through
+`In QA` and `Ready for Deployment`. The two agree on the buttons ESCB's map actually fills in
+today — `In progress` and `Ready for CR` are the same words on both — so the committed file is
+still the flat one-flow shape. They part company after In CodeReview, and the entry that will land
+there is `shipped`: closing its own work means `Done` on a subtask and something else entirely
+on a story, which one flat map cannot say. Since the subtask rule (`0010`) the golem moves both
+kinds — the subtasks when that rule scopes a story to them, the labelled issue itself when it
+does not — so the shape had to exist before that entry could be written.
+
+So the file grew one level: `"*"` is the flow for any type not named, a named type overrides it
+*moment by moment*, and the flat shape still means one flow for everything. Three things follow
+from that choice. Overriding per moment rather than per map keeps the two flows sharing what
+they agree on, which is most of it — at the cost of one new piece of vocabulary, an entry that
+is present and empty, which is how a type opts out of a moment the fallback moves. The shape is
+detected from the file's own values rather than a version key, so the file that existed before
+this still parses and a file holding both shapes is a startup failure rather than a guess. And
+which flow applies is resolved from the issue the moment *lands on*, not the labelled one, which
+is the only reading consistent with "what moves is what the run implements".
+
+The type names are the one part of the file that cannot be checked against the file itself, and
+they get a warning rather than the startup failure a misspelled moment gets. The asymmetry is
+deliberate: a moment is wrong on its face, offline and forever, while an issue type is only
+wrong relative to a Jira that has to be asked — and a watcher that refuses to start because a
+permissions hiccup lost it the answer would be trading a silent override for a dead factory.
+
+Two consequences of putting the map behind the adapter rather than on the port. The map is
+additive to the labels, not a replacement: with it empty the Jira mirror is byte-for-byte the
+labels-first one, which is what makes filling it in safe. And `shipped` gets the last word — the
+`stopped` the watcher fires one breath later, letting go of a merged issue, moves nothing,
+because a `stopped` transition would drag the issue back out of the status shipping just put it
+in. Nothing is ever transitioned *back*, either: an issue released before it was tracked keeps
+the status `picked-up` moved it to, and re-adding the label simply finds that transition no
+longer offered.
 
 ## The Forge is not a port
 
@@ -91,7 +152,10 @@ a dashboard that is deliberately optional.
   prose. The watcher still composes its release comments, its orphan warning and a handful of
   messages in GitHub's vocabulary ("re-add the **Sandcastle** label"), above the port — kept
   there because this refactor's acceptance bar was byte-for-byte equivalence, not neutral
-  wording. Moving that prose behind the port is the second adapter's first job.
+  wording. The second adapter (Jira, #14) shipped labels-first without paying this down: it
+  posts the watcher's prose as plain text, where GitHub markdown renders as literal asterisks —
+  legible, not pretty. Moving that prose behind the port is still open, and still the first
+  thing to reach for when the wording starts to matter.
 - **`SANDCASTLE_TRACKER` is validated, not trusted.** A typo is a loud startup failure, because
   a watcher silently falling back to GitHub against a queue that lives elsewhere would look
   exactly like a watcher with nothing to do.
