@@ -31,8 +31,9 @@ import type { Issue, Tracked } from "../types.mts";
 // `shipped` moment does real work here.
 //
 // On top of the labels sits the transition map: a committed file naming, per
-// moment, a Jira transition to fire. It ships empty, so labels-first is still
-// the behaviour until a team fills it in — see `readTransitionMap` below.
+// moment, a Jira transition to fire — one flow per issue type where a project has
+// more than one, which ESCB does. An absent or empty file leaves labels-first as
+// the behaviour, so it stays opt-in — see `readTransitionMaps` below.
 //
 // Beside it sits the subtask rule, which answers a different question: given a
 // story that is split into a frontend subtask and a backend one, which of them is
@@ -195,12 +196,24 @@ type JiraRelated = {
     status?: { name?: string; statusCategory?: { key?: string } };
     /** Only ever present on a full issue — a subtask cannot have subtasks. */
     subtasks?: JiraRelated[];
+    /**
+     * Which workflow the issue runs, in effect: a Jira workflow scheme binds a
+     * workflow per issue type, so this is what decides which flow a transition is
+     * looked up in. Present on the stub, which is why scoping a story to its
+     * subtasks costs no extra call to learn their types.
+     */
+    issuetype?: { name?: string };
   };
 };
 
 type JiraIssue = {
   key: string;
-  fields?: { summary?: string; subtasks?: JiraRelated[]; parent?: JiraRelated };
+  fields?: {
+    summary?: string;
+    subtasks?: JiraRelated[];
+    parent?: JiraRelated;
+    issuetype?: { name?: string };
+  };
 };
 type JiraSearch = { issues?: JiraIssue[] };
 type JiraTransition = { id?: string; name?: string };
@@ -276,10 +289,41 @@ const notYours = (subtasks: JiraRelated[]) =>
  * a transition id is a per-workflow integer nobody can read or review, while the
  * name is the word on the button. Every entry is optional and so is the file, so
  * a project that configures nothing keeps the labels-first mirror it started
- * with — see `.sandcastle/jira-transitions.json`, which ships with all six
- * moments spelled out and empty.
+ * with — see `.sandcastle/jira-transitions.json`.
  */
 type TransitionMap = Partial<Record<Moment["type"], string>>;
+
+/**
+ * And *which* map applies, because one project has more than one flow. A Jira
+ * workflow scheme binds a workflow per issue **type**: in ESCB a Sub-task runs
+ * `To Do → In Progress → In CodeReview → Done`, while the Story above it carries
+ * on through `In QA` and `Ready for Deployment` — one board, the same words for
+ * the transitions they share, a different graph. A single flat map cannot say
+ * "shipped means Done on a subtask and Ready for CR on a story", and the golem
+ * moves both kinds: the subtasks when `jira-subtasks.json` scopes a story to
+ * them, the labelled issue itself when it does not.
+ *
+ * So the file has two shapes, and the flat one it shipped with is still valid:
+ *
+ *     { "picked-up": "In progress" }            // one flow, whatever the type
+ *
+ *     { "*":        { "picked-up": "In progress", "shipped": "Ready for CR" },
+ *       "Sub-task": { "shipped": "Done" } }     // …and where one type differs
+ *
+ * A named type *overrides* the fallback moment by moment rather than replacing it
+ * whole, so two flows share what they agree on — which is most of it. An entry
+ * that is present and empty is how a type says "this moment moves nothing here",
+ * against a fallback that moves something.
+ */
+type TransitionMaps = {
+  /** `"*"`, or the whole file when it is flat: what an unnamed issue type gets. */
+  readonly fallback: TransitionMap;
+  /** The named types, keyed by the name as written in the file and matched ignoring case. */
+  readonly byType: ReadonlyMap<string, TransitionMap>;
+};
+
+/** The fallback's key in the per-type shape. Not a legal Jira issue type name, so it cannot collide. */
+const ANY_TYPE = "*";
 
 /**
  * The six moment names as values, which is what checking the file's keys needs.
@@ -315,25 +359,59 @@ function unusableMap(detail: string): never {
       `It maps lifecycle moments to the names of Jira transitions, and every entry is optional:\n` +
       `  { ${MOMENT_NAMES.map((moment) => `"${moment}": ""`).join(", ")} }\n` +
       `An empty name means that moment does not move the workflow; deleting the file means none of ` +
-      `them do, and the mirror is labels only.`,
+      `them do, and the mirror is labels only.\n\n` +
+      `Where issue types run different workflows, the same moments go one level down, under the ` +
+      `type's name — with "${ANY_TYPE}" for the types not named:\n` +
+      `  { "${ANY_TYPE}": { "picked-up": "In progress" }, "Sub-task": { "shipped": "Done" } }`,
   );
   process.exit(1);
 }
 
 /**
- * Read the map once, at construction. Validated rather than trusted, in the same
+ * One flow's worth of entries, validated. `keepEmpty` is what lets a named type
+ * silence a moment the fallback moves: at the top level an empty name is a moment
+ * left unconfigured, one level down it is a deliberate nothing.
+ */
+const readMap = (source: unknown, where: string, keepEmpty: boolean): TransitionMap => {
+  if (typeof source !== "object" || source === null || Array.isArray(source)) {
+    unusableMap(
+      `${where} holds ${Array.isArray(source) ? "an array" : `a JSON ${typeof source}`}, not an object`,
+    );
+  }
+
+  const map: TransitionMap = {};
+  for (const [key, name] of Object.entries(source)) {
+    if (!isMoment(key)) {
+      unusableMap(`"${key}" in ${where} is not a lifecycle moment — the six are ${MOMENT_NAMES.join(", ")}`);
+    }
+    if (typeof name !== "string") {
+      unusableMap(`"${key}" in ${where} must name a transition as a string, but holds ${JSON.stringify(name)}`);
+    }
+    // A map spells its moments out so that whoever fills it in can see them; an
+    // empty one is a moment left unconfigured, not a nameless transition to go
+    // looking for.
+    if (name.trim()) map[key] = name.trim();
+    else if (keepEmpty) map[key] = "";
+  }
+  return map;
+};
+
+/**
+ * Read the file once, at construction. Validated rather than trusted, in the same
  * spirit as SANDCASTLE_TRACKER: an unknown key is almost always a misspelled
  * moment, and a misspelled moment is indistinguishable from a factory that
  * ignores the file.
  *
- * Note what is *not* validated — the transition names themselves. Jira offers
- * only the transitions an issue's current status allows, so a name is available
- * at one moment and not at another and there is nothing to check up front; that
- * resolution happens at the moment, in `moveWorkflow`.
+ * Note what is *not* validated here — the transition names themselves, and the
+ * issue type names. Jira offers only the transitions an issue's current status
+ * allows, so a name is available at one moment and not at another and there is
+ * nothing to check up front; that resolution happens at the moment, in
+ * `moveWorkflow`. The type names need Jira to check at all, so `verify` does it,
+ * with a warning rather than an exit.
  */
-const readTransitionMap = (): TransitionMap => {
+const readTransitionMaps = (): TransitionMaps => {
   // Absent means labels-first — the deployment that never opted in.
-  if (!existsSync(JIRA_TRANSITIONS)) return {};
+  if (!existsSync(JIRA_TRANSITIONS)) return { fallback: {}, byType: new Map() };
 
   let parsed: unknown;
   try {
@@ -345,20 +423,37 @@ const readTransitionMap = (): TransitionMap => {
     unusableMap(`it holds ${Array.isArray(parsed) ? "an array" : `a JSON ${typeof parsed}`}, not an object`);
   }
 
-  const map: TransitionMap = {};
-  for (const [key, name] of Object.entries(parsed)) {
-    if (!isMoment(key)) {
-      unusableMap(`"${key}" is not a lifecycle moment — the six are ${MOMENT_NAMES.join(", ")}`);
-    }
-    if (typeof name !== "string") {
-      unusableMap(`"${key}" must name a transition as a string, but holds ${JSON.stringify(name)}`);
-    }
-    // The shipped file spells all six keys out so that whoever fills it in can
-    // see them; an empty one is a moment left unconfigured, not a nameless
-    // transition to go looking for.
-    if (name.trim()) map[key] = name.trim();
+  // Which of the two shapes the file is in, decided by what its values are rather
+  // than by a version key: a moment maps to a string, an issue type to a map of
+  // them. A file holding both is a half-finished edit — and the one case where
+  // guessing would quietly drop half of what was written.
+  const entries = Object.entries(parsed);
+  const nested = entries.filter(
+    ([, value]) => typeof value === "object" && value !== null && !Array.isArray(value),
+  );
+  if (nested.length > 0 && nested.length < entries.length) {
+    const quoted = (keys: string[]) => keys.map((key) => `"${key}"`).join(", ");
+    const flat = entries.filter(([key]) => !nested.some(([type]) => type === key)).map(([key]) => key);
+    const types = nested.map(([type]) => type);
+    unusableMap(
+      `it mixes the two shapes — ${quoted(flat)} ${flat.length === 1 ? "names" : "name"} a transition ` +
+        `directly, while ${quoted(types)} ${types.length === 1 ? "holds a map of its own" : "hold one map each"}. ` +
+        `Either the moments sit at the top level, or every key is an issue type with "${ANY_TYPE}" for the rest`,
+    );
   }
-  return map;
+
+  // The flat shape: the file is one flow, and every issue type runs it.
+  if (nested.length === 0) {
+    return { fallback: readMap(parsed, JIRA_TRANSITIONS_REF, false), byType: new Map() };
+  }
+
+  let fallback: TransitionMap = {};
+  const byType = new Map<string, TransitionMap>();
+  for (const [type, map] of nested) {
+    if (type.trim() === ANY_TYPE) fallback = readMap(map, `"${ANY_TYPE}"`, false);
+    else byType.set(type.trim(), readMap(map, `"${type}"`, true));
+  }
+  return { fallback, byType };
 };
 
 // ---------------------------------------------------------- the subtask rule
@@ -600,8 +695,7 @@ export const jiraTracker = (): Tracker => {
   // Read here for the same reason the credentials are: construction is where an
   // adapter reads its own configuration, so a GitHub deployment never opens this
   // file and a Jira one never reads it twice.
-  const transitions = readTransitionMap();
-  const configured = Object.entries(transitions);
+  const { fallback, byType } = readTransitionMaps();
   const rule = readSubtaskRule();
 
   const browseUrl = (key: string) => `${JIRA_BASE_URL}/browse/${key}`;
@@ -649,21 +743,151 @@ export const jiraTracker = (): Tracker => {
   };
 
   /**
+   * An issue's type, remembered: an issue does not change type under a run, and
+   * the same key is asked about at up to six moments. Seeded by every call that
+   * already brings a type back, so the extra GET below happens only for a labelled
+   * issue worked whole on a deployment with no subtask rule.
+   */
+  const types = new Map<string, string>();
+
+  const remember = (issue: JiraIssue) => {
+    const own = issue.fields?.issuetype?.name;
+    if (own) types.set(issue.key, own);
+    for (const subtask of issue.fields?.subtasks ?? []) {
+      const name = subtask.fields?.issuetype?.name;
+      if (name) types.set(subtask.key, name);
+    }
+  };
+
+  /**
    * One issue's scope, resolved from Jira rather than remembered: the same answer
    * has to come out after a restart, days into a wait, with nothing on disk but the
    * key. One call, and none at all when no rule is configured.
    */
   const scopeFor = async (key: string): Promise<Scope> => {
     if (!rule) return { kind: "issue" };
-    const issue = (await call("GET", `/rest/api/3/issue/${key}?fields=summary,subtasks`)) as JiraIssue;
+    const issue = (await call(
+      "GET",
+      `/rest/api/3/issue/${key}?fields=summary,subtasks,issuetype`,
+    )) as JiraIssue;
+    remember(issue);
     const scope = scopeOf(rule, issue);
     describeScope(key, scope);
     return scope;
   };
 
-  /** The issues a moment moves: this repository's subtasks, or the issue itself. */
-  const workKeys = (key: string, scope: Scope) =>
-    scope.kind === "subtasks" ? scope.work.map((s) => s.key) : [key];
+  /**
+   * The issues a moment moves, each with its type where Jira has already said so:
+   * this repository's subtasks, or the issue itself. The type is what decides
+   * which flow the moment is looked up in, and a subtask arrives inside its story
+   * carrying it — so scoping to subtasks costs nothing to resolve.
+   */
+  const workItems = (key: string, scope: Scope): { key: string; type?: string }[] =>
+    scope.kind === "subtasks"
+      ? scope.work.map((s) => ({ key: s.key, type: s.fields?.issuetype?.name }))
+      : [{ key }];
+
+  const typeOf = async (key: string): Promise<string | undefined> => {
+    const known = types.get(key);
+    if (known) return known;
+    try {
+      const issue = (await call("GET", `/rest/api/3/issue/${key}?fields=issuetype`)) as JiraIssue;
+      remember(issue);
+    } catch (error) {
+      // Falls through to the fallback flow, which is the right guess when the
+      // answer is unavailable: it is the one every unnamed type already runs.
+      log(`  WARNING: could not read what type of issue ${key} is: ${describe(error)}`);
+    }
+    return types.get(key);
+  };
+
+  /** Ignoring case, because the name was typed into a JSON file by a human reading it off Jira. */
+  const flowFor = (type: string): TransitionMap | undefined => {
+    for (const [name, map] of byType) {
+      if (name.toLowerCase() === type.toLowerCase()) return map;
+    }
+    return undefined;
+  };
+
+  /**
+   * Does *any* flow fire something at this moment? Asked before anything is
+   * resolved, so an unconfigured moment still costs no API call at all — which is
+   * every moment on a deployment that filled nothing in.
+   */
+  const movesAt = (moment: Moment["type"]) =>
+    Boolean(fallback[moment]) || [...byType.values()].some((map) => Boolean(map[moment]));
+
+  /**
+   * The transition this moment fires on this issue. `known` is the type when the
+   * caller already has it; the flat shape needs no type at all, so a project with
+   * one flow never asks Jira for one.
+   */
+  const transitionFor = async (
+    moment: Moment["type"],
+    key: string,
+    known: string | undefined,
+  ): Promise<string | undefined> => {
+    if (byType.size === 0) return fallback[moment];
+
+    const type = known ?? (await typeOf(key));
+    const flow = type ? flowFor(type) : undefined;
+    // `hasOwn` because an entry that is present and empty is this type saying the
+    // moment moves nothing — the one thing a missing entry does not mean.
+    return flow && Object.hasOwn(flow, moment) ? flow[moment] : fallback[moment];
+  };
+
+  /**
+   * The transition map as the startup banner says it: one line for the fallback and
+   * one per named type, in the order the file wrote them. A moment present and
+   * empty is printed as the nothing it is, because that is a decision somebody made
+   * and the banner is where it can still be questioned.
+   */
+  const transitionLines = (): string[] => {
+    const spell = (map: TransitionMap) =>
+      Object.entries(map)
+        .map(([moment, name]) => `${moment} → ${name ? `"${name}"` : "nothing"}`)
+        .join(", ");
+
+    const shared = Object.keys(fallback).length
+      ? `Jira: transitions${byType.size ? " on any other issue" : ""} — ${spell(fallback)}.`
+      : byType.size
+        ? `Jira: no transitions for an issue type not named in ${JIRA_TRANSITIONS_REF}.`
+        : `Jira: no transitions configured in ${JIRA_TRANSITIONS_REF}; the mirror is labels only.`;
+
+    return [shared, ...[...byType].map(([type, map]) => `Jira: transitions on a ${type} — ${spell(map)}.`)];
+  };
+
+  /**
+   * The one part of the file that can be checked against Jira but not against
+   * itself: a type named in it that the project has no issue type for. It is the
+   * same class of mistake as a misspelled moment — an override that silently never
+   * applies — but it takes a call to catch, so it is a warning rather than the
+   * startup failure a misspelled moment gets. A project that cannot be read at all
+   * says so and moves on: the credentials have just been proven, so this is a
+   * permission, not a reason to refuse to start.
+   */
+  const warnUnknownTypes = async () => {
+    if (byType.size === 0) return;
+    try {
+      const project = (await call("GET", `/rest/api/3/project/${JIRA_PROJECT}/statuses`)) as {
+        name?: string;
+      }[];
+      const known = project.map((type) => type.name).filter((name): name is string => Boolean(name));
+      const missing = [...byType.keys()].filter(
+        (name) => !known.some((type) => type.toLowerCase() === name.toLowerCase()),
+      );
+      if (missing.length > 0) {
+        log(
+          `  WARNING: ${JIRA_TRANSITIONS_REF} names ${missing.map((name) => `"${name}"`).join(" and ")}, ` +
+            `which ${JIRA_PROJECT} has no issue type called — ` +
+            `${missing.length === 1 ? "that flow" : "those flows"} will never apply. ` +
+            `Its types are ${known.join(", ")}.`,
+        );
+      }
+    } catch (error) {
+      log(`  WARNING: could not check the issue types in ${JIRA_TRANSITIONS_REF}: ${describe(error)}`);
+    }
+  };
 
   /**
    * The transitions the issue is offering *now*. Asked per moment and never
@@ -705,32 +929,39 @@ export const jiraTracker = (): Tracker => {
   };
 
   /**
-   * Fire the transition this moment is mapped to, if it is mapped to one and the
-   * issue is offering it. Everything else — an unconfigured moment, a name this
-   * status does not offer, a rejected POST — is a log line and a shrug: a
-   * workflow edited in Jira degrades the mirror, never the factory. The offered
-   * names go into the skipped line, because they are exactly what belongs in the
-   * map file instead.
+   * Fire the transition this moment is mapped to — in the flow the issue's own type
+   * runs — if it is mapped to one and the issue is offering it. Everything else: an
+   * unconfigured moment, a flow that deliberately moves nothing here, a name this
+   * status does not offer, a rejected POST — is a log line and a shrug, or silence
+   * where silence was configured. A workflow edited in Jira degrades the mirror,
+   * never the factory. The offered names go into the skipped line, because they are
+   * exactly what belongs in the map file instead.
    */
   const moveWorkflow = async (issue: Issue, moment: Moment["type"]) => {
-    const wanted = transitions[moment];
-    if (!wanted) return;
+    if (!movesAt(moment)) return;
 
     // The board column that should move is the one the golem is actually working:
     // a story whose frontend subtask this run implements has its *subtask* started
     // and finished, and stories are what subtasks add up to. Resolved per moment
     // for the same reason the transition names are — this is a mirror, and the
     // shape of the story may have changed since the run began.
-    let keys: string[];
+    let items: { key: string; type?: string }[];
     try {
-      keys = workKeys(issue.key, await scopeFor(issue.key));
+      items = workItems(issue.key, await scopeFor(issue.key));
     } catch (error) {
       log(`  WARNING: could not read ${issue.key}'s subtasks at ${moment}: ${describe(error)}`);
-      keys = [issue.key];
+      items = [{ key: issue.key }];
     }
 
-    for (const key of keys) {
+    for (const { key, type } of items) {
       try {
+        // Resolved per issue rather than per moment, because a story and the
+        // subtask under it run different workflows — and the subtask is the one a
+        // scoped run moves. An empty answer is a flow that says this moment moves
+        // nothing, which is a configured silence and so not worth a log line.
+        const wanted = await transitionFor(moment, key, type);
+        if (!wanted) continue;
+
         const offered = await offeredTransitions(key);
         // Loosely matched, because the name was typed into a JSON file by a human
         // reading it off a button.
@@ -816,12 +1047,10 @@ export const jiraTracker = (): Tracker => {
         log(`Jira: authenticated as ${me.displayName ?? email} against ${JIRA_BASE_URL}.`);
         // Said out loud at startup because it is committed configuration nobody
         // has been notified about: the operator should see which moments will move
-        // the workflow before an issue does it for them.
-        log(
-          configured.length
-            ? `Jira: transitions — ${configured.map(([moment, name]) => `${moment} → "${name}"`).join(", ")}.`
-            : `Jira: no transitions configured in ${JIRA_TRANSITIONS_REF}; the mirror is labels only.`,
-        );
+        // the workflow, and on which kind of issue, before an issue does it for
+        // them.
+        for (const line of transitionLines()) log(line);
+        await warnUnknownTypes();
         // And for the same reason: which half of a story this golem will take is
         // the difference between a queue that looks empty and one that is.
         log(

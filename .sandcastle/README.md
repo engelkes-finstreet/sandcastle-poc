@@ -73,7 +73,7 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 ├── Dockerfile    the image every run starts from
 ├── .env          the sandbox's secrets — forwarded into the container, gitignored
 ├── host.env      the watcher's own config — never forwarded, gitignored
-├── jira-transitions.json    moment → Jira transition, when the tracker is Jira
+├── jira-transitions.json    moment → Jira transition, one flow per issue type
 ├── jira-subtasks.json       which subtask of a story is this repository's work
 └── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
 ```
@@ -91,7 +91,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `phases.mts` | the agent runs, and how a container is configured for them |
 | `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
 | `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
-| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, the transition map, and the subtask rule that decides which half of a story this repository implements — see below |
+| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, the transition map and its flow per issue type, and the subtask rule that decides which half of a story this repository implements — see below |
 | `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
@@ -319,10 +319,10 @@ shell overrides it for a single run.
 
 Two pieces of configuration are deliberately *not* environment variables, and both are
 committed, reviewable files under `.sandcastle/`. `jira-transitions.json` maps lifecycle moments
-to Jira workflow transitions; `jira-subtasks.json` says which subtask of a story this repository
-implements. Which transitions a project's workflow offers is a property of the project, and which
-discipline a golem writes is a property of the repository it is pointed at — neither is a property
-of the shell that starts the watcher. Both are described below.
+to Jira workflow transitions, one flow per issue type; `jira-subtasks.json` says which subtask of
+a story this repository implements. Which transitions a project's workflow offers is a property of
+the project, and which discipline a golem writes is a property of the repository it is pointed at —
+neither is a property of the shell that starts the watcher. Both are described below.
 
 ### Jira as the tracker
 
@@ -464,29 +464,25 @@ repository; a story with neither is worked whole.
 Labels are the mirror every Jira project gets for free. Moving the *workflow* — the board
 column the issue sits in — is opt-in, because a transition that exists on one project's workflow
 does not exist on another's. It is configured in **`.sandcastle/jira-transitions.json`**, which
-is committed, and which ships with all six lifecycle moments spelled out and empty:
+is committed, and which in this repository holds what ESCB agreed the golem may move:
 
 ```json
 {
-  "picked-up": "",
+  "picked-up": "In progress",
   "awaiting-approval": "",
   "implementing": "",
-  "awaiting-revision": "",
+  "awaiting-revision": "Ready for CR",
   "shipped": "",
   "stopped": ""
 }
 ```
 
-Fill one in with the name of a transition — the words on the button in Jira, matched ignoring
-case and surrounding space — and that moment moves the issue. A plausible ESCB filling:
-
-```json
-{
-  "picked-up": "In Progress",
-  "awaiting-approval": "In Review",
-  "shipped": "Done"
-}
-```
+Two moves, and they are the two a developer would make by hand: **To Do → In Progress** when the
+golem takes the issue, and **In Progress → In CodeReview** when its implementation pull request
+goes up for review. The merge is a human's, and so is the column after it — for now. What a moment
+names is a **transition**, the words on the button in Jira, matched ignoring case and surrounding
+space, and not the board column, which is the status the button leads *to*: on both ESCB workflows
+the button says `Ready for CR` where the column says `In CodeReview`.
 
 The six moments are the watcher's, and they are the same six on every tracker:
 
@@ -495,13 +491,65 @@ The six moments are the watcher's, and they are the same six on every tracker:
 | `picked-up` | the issue leaves the queue and phase 1 starts |
 | `awaiting-approval` | the plan is posted and a human's approval is what happens next |
 | `implementing` | approval landed and phase 3 starts |
-| `awaiting-revision` | the code shipped and the watcher is listening for `revise` |
+| `awaiting-revision` | the implementation pull request is up for review and the watcher is listening for `revise` |
 | `shipped` | the pull request merged |
 | `stopped` | the watcher let the issue go — abandoned, blocked, rounds spent, closed unmerged |
 
-Every entry is optional, and so is the file: with all six empty, or the file deleted, the mirror
-is labels only and Jira behaves exactly as it did before this existed. Five things worth
-knowing:
+Every entry is optional, and so is the file: with everything empty, or the file deleted, the
+mirror is labels only and Jira behaves exactly as it did before this existed.
+
+##### Why the other four are empty
+
+`awaiting-approval` has nothing honest to move to: ESCB has no status for *a plan is waiting for a
+human*, and `In CodeReview` would be a lie, because no code exists yet. The issue stays In
+Progress and the `Sandcastle:awaiting-approval` label carries that state on its own. `implementing`
+would ask for `In progress` on an issue that is already In Progress — which Jira does not offer
+from there, so it would print a skip line every run to change nothing. `shipped` is empty because
+the agreement is that a human merges the pull request and moves Jira with it. And `stopped` is
+empty on purpose, for the reason in the list below.
+
+`shipped` is the one likely to change. The day the golem is trusted to close its own work, that is
+the entry to fill in — and it is also where ESCB's two workflows part company, which is what the
+next section is about.
+
+##### One flow per issue type
+
+A Jira workflow scheme binds a workflow **per issue type**, and ESCB has two:
+
+| Issue type | Its flow |
+|---|---|
+| **Sub-task** | `To Do → In Progress → In CodeReview → Done` |
+| **Story**, **Task**, **Bug** | `To refine → To Do → In Progress → In CodeReview → In QA → Ready for Deployment → Done`, with `QA Rejected → In Progress` |
+
+One board, and the same words on the buttons the two share — `In progress` and `Ready for CR` are
+the same transition names on a Sub-task as on a Story — so the two moments the map fills in today
+need only one flow, and the file above is the flat shape. They part company *after* In CodeReview:
+a subtask's life ends at `Done`, while the story above it carries on to a QA pass and a deployment
+the golem knows nothing about. A `shipped` that closed its own work would have to mean `Done` on a
+subtask and something else on a story — one map, two answers.
+
+So the file takes a second shape for that, keyed by issue type with `"*"` for the ones not named:
+
+```json
+{
+  "*":        { "picked-up": "In progress", "awaiting-revision": "Ready for CR" },
+  "Sub-task": { "shipped": "Done" }
+}
+```
+
+A named type overrides `"*"` **moment by moment** rather than replacing it whole, so two flows
+share what they agree on — which is most of it. An entry that is present and empty is how a type
+says *this moment moves nothing here* against a fallback that moves something. Mixing the shapes —
+a moment and an issue type side by side at the top level — is a startup failure naming both: it is
+a half-finished edit, and the one case where guessing would quietly drop half of what was written.
+
+Which flow applies is decided from the issue the moment is *landing on*, not from the labelled
+one: on a story scoped to its `[FE]` subtask, every moment moves the subtask, so the **Sub-task**
+flow is the one that applies. The subtask's type arrives with the story, so that costs no extra
+call; a labelled issue worked whole costs one, remembered for the rest of the run; the flat shape
+costs none, because it never has to ask.
+
+##### Worth knowing
 
 - **Names are resolved at the moment, not at startup.** Jira offers only the transitions the
   issue's *current* status allows, so a name is available at one moment and not at another. A
@@ -509,23 +557,49 @@ knowing:
   is the fastest way to find out what belongs in the file. A workflow edited in Jira degrades
   the mirror; it never fails a run.
 - **A misspelled *moment* is a startup failure.** The six keys above are the only ones allowed,
-  because a typo'd key would silently never fire and read as "transitions don't work". The
-  watcher says which file and which key, and stops.
+  at either level, because a typo'd key would silently never fire and read as "transitions don't
+  work". The watcher says which file, which flow and which key, and stops.
+- **A misspelled *issue type* is a warning.** `"Subtask"` where ESCB has `Sub-task` is the same
+  class of mistake — an override that never applies — but catching it takes a call to Jira, so
+  startup says `names "Subtask", which ESCB has no issue type called … Its types are Task,
+  Sub-task, Story, Bug, Epic` and carries on rather than refusing to run on something the network
+  told it.
+- **An empty name one level down is a silence, not a gap.** In `"*"`, and in the flat shape, an
+  empty name is a moment left unconfigured. Under a named type it is louder: it overrides a
+  fallback that *does* move something, which is how one issue type opts out of a moment every
+  other type mirrors.
+- **`awaiting-revision` fires once.** It is signalled where phase 3 ends, and a follow-up round
+  after a `revise` comment does *not* re-signal it — so the In CodeReview move happens exactly
+  once and the column never bounces while a pull request is being reworked.
 - **`shipped` is the last word.** On a merge the watcher fires `shipped` and then, letting go,
   `stopped`. The stop that trails a ship moves nothing and says nothing — otherwise a `stopped`
-  transition would drag the issue back out of the status shipping just put it in.
+  transition would drag the issue back out of the status shipping just put it in. This is why
+  `stopped` is empty and would stay empty even if `shipped` were filled in.
 - **Nothing is ever transitioned back.** If a run fails before the issue is tracked, the
   `Sandcastle` label comes off with a comment (as it always did) but the `picked-up` transition
   stands: the map has no reverse. Re-adding the label picks the issue up again, and the
   `picked-up` transition its status no longer offers is skipped with a log line.
 - **What moves is what the run implements.** On a story scoped to a `[FE]` subtask by
   `jira-subtasks.json`, every one of these moments transitions the *subtask*: it is the thing a
-  developer would move, and a story that jumped to In Review while both its halves sat in To Do
-  would be a lie on the board. Where there is no subtask to scope to, the labelled issue moves,
-  as it always did. Each log line names the key it moved, so the two cases are never a guess.
+  developer would move, and a story that jumped to In CodeReview while both its halves sat in To
+  Do would be a lie on the board. Where there is no subtask to scope to, the labelled issue
+  moves, as it always did. Each log line names the key it moved, so the two cases are never a
+  guess.
 
-Startup prints which moments are configured, right before the `Watching …` banner, so the answer
-to "will this move anything" is in the first lines of the log.
+Startup prints the map, one line per flow, right before the `Watching …` banner, so the answer to
+"will this move anything, and on what" is in the first lines of the log. What ESCB's committed file
+prints today:
+
+```
+Jira: transitions — picked-up → "In progress", awaiting-revision → "Ready for CR".
+```
+
+and what the per-type shape in the example above would print instead:
+
+```
+Jira: transitions on any other issue — picked-up → "In progress", awaiting-revision → "Ready for CR".
+Jira: transitions on a Sub-task — shipped → "Done".
+```
 
 #### Trying it for real, on a scratch issue
 
@@ -575,7 +649,8 @@ cannot browse, a site that is not Jira Cloud. It is the host's half of `pnpm san
 which checks the *container*, where these credentials deliberately do not exist.
 
 **2. Learn the transition names from the issue itself.** Names, not board columns: the button
-says *Start work* where the column says *In Progress*, and the map wants the button.
+says *In progress* where the column says *In Progress*, and *Ready for CR* where the column says
+*In CodeReview* — the map wants the button.
 
 ```bash
 curl -su "$JIRA_EMAIL:$JIRA_API_TOKEN" \
@@ -585,13 +660,17 @@ curl -su "$JIRA_EMAIL:$JIRA_API_TOKEN" \
 
 Run it again after each moment: the list is *not* fixed. It is what ESCB-123's current status
 offers, which is why the map resolves names at the moment rather than at startup — and why the
-skip line prints the offered names when a configured one is not among them.
+skip line prints the offered names when a configured one is not among them. Ask a **subtask** as
+well as a story, because the two run different workflows — they happen to agree on the two names
+the map uses today, and diverge after In CodeReview, which is what a `"Sub-task"` flow would have
+to be filled in from.
 
 **3. Configure one moment first — `picked-up`.** It fires within seconds of the watcher
-noticing the label, so the wiring is confirmed or not before an agent has done any work:
+noticing the label, so the wiring is confirmed or not before an agent has done any work. ESCB's
+committed map already does this, and either shape says it:
 
 ```json
-{ "picked-up": "Start work" }
+{ "picked-up": "In progress" }
 ```
 
 **4. A scratch issue with a real, tiny task.** Give it a summary and a description an agent can
@@ -619,7 +698,7 @@ The first four lines answer everything about configuration:
 
 ```
 Jira: authenticated as … against https://finstreet-team.atlassian.net.
-Jira: transitions — picked-up → "Start work".
+Jira: transitions — picked-up → "In progress", awaiting-revision → "Ready for CR".
 Jira: subtasks — working the "[FE]" subtask of a labelled story, leaving "[BE]" to another repository; a story with neither is worked whole.
 Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandcastle".
 ```
@@ -628,10 +707,11 @@ Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandc
 
 | After | The log says | Check in Jira |
 |---|---|---|
-| pickup | `jira: ESCB-123 → ESCB-124 — the "[FE]" work on it`, then `jira: ESCB-124 → "Start work" (picked-up)` | the **subtask** moved column, and its History tab records it. Where the story has no `[FE]` subtask, both lines name the story instead |
+| pickup | `jira: ESCB-123 → ESCB-124 — the "[FE]" work on it`, then `jira: ESCB-124 → "In progress" (picked-up)` | the **subtask** moved column, and its History tab records it. Where the story has no `[FE]` subtask, both lines name the story instead |
 | the plan is posted | `jira: … (awaiting-approval)`, if configured | `Sandcastle` swapped for `Sandcastle:awaiting-approval`, a comment with the pull request link, and the branch and PR under **Development** — that panel is Jira matching the bare key, with no integration on our side |
-| you comment `approve` | `jira: … (implementing)`, if configured | the column again |
-| you merge | `jira: … (shipped)`, if configured | the column, **one** comment, and — the thing worth confirming — that the `stopped` moment one second later moved *nothing* |
+| you comment `approve` | nothing from `implementing`, which is unconfigured | the column has not moved: the issue was already In Progress |
+| the implementation pull request goes up | `jira: ESCB-124 → "Ready for CR" (awaiting-revision)` | the **subtask** is In CodeReview, its History records it, and the pull request is marked ready for review |
+| you merge | nothing from `shipped`, and nothing from the `stopped` one second later | the column is yours to move — this is the moment to confirm the golem did **not** touch it |
 
 **7. Then break it on purpose**, because the failure modes are the reason the map is shaped this
 way. Each takes one edit and one poll:
@@ -646,9 +726,16 @@ way. Each takes one edit and one poll:
 - **Nothing configured at all.** Empty the map, or `mv` the file away, and re-run: labels and
   comments only, exactly as before the map existed. This is the one to try last — it is what
   every other project gets.
-- **A misspelled moment.** `"picked_up"` instead of `"picked-up"`. The watcher refuses to start
-  and names the file and the six valid keys. A typo here is the one thing that is *not*
-  best-effort.
+- **A misspelled moment.** `"picked_up"` instead of `"picked-up"`, at either level. The watcher
+  refuses to start and names the file, the flow and the six valid keys. A typo here is the one
+  thing that is *not* best-effort.
+- **A misspelled issue type.** `"Subtask"` instead of `"Sub-task"`. Startup warns that ESCB has
+  no such type and lists the ones it has, then runs: that override simply never applies, and every
+  subtask takes the `"*"` flow instead.
+- **Two flows disagreeing on one moment.** Move the map into the per-type shape and put
+  `"awaiting-revision": ""` under `"Sub-task"`. A scoped story's subtask then stays in In Progress
+  when its pull request goes up, while a story worked whole still moves — which is what an empty
+  name under a named type is for.
 
 **8. Clean up after yourself.** The scratch issue's label comes off when you merge or close the
 pull request, but the rest is yours to remove:

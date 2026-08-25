@@ -1,8 +1,8 @@
 {
-  "picked-up": "",
+  "picked-up": "In progress",
   "awaiting-approval": "",
   "implementing": "",
-  "awaiting-revision": "",
+  "awaiting-revision": "Ready for CR",
   "shipped": "",
   "stopped": ""
 }

@@ -68,6 +68,33 @@ unresolvable is skipped, and the labels — which every Jira project has, whatev
 remain the mirror that has to work. The one thing that *is* loud is a misspelled moment key,
 because that would read as a factory ignoring the file.
 
+*(Amended again for one flow per issue type.)* One project turned out to have more than one
+workflow. A Jira workflow scheme binds a workflow **per issue type**: in ESCB a Sub-task runs
+`To Do → In Progress → In CodeReview → Done`, while the Story above it carries on through
+`In QA` and `Ready for Deployment`. The two agree on the buttons ESCB's map actually fills in
+today — `In progress` and `Ready for CR` are the same words on both — so the committed file is
+still the flat one-flow shape. They part company after In CodeReview, and the entry that will land
+there is `shipped`: closing its own work means `Done` on a subtask and something else entirely
+on a story, which one flat map cannot say. Since the subtask rule (`0010`) the golem moves both
+kinds — the subtasks when that rule scopes a story to them, the labelled issue itself when it
+does not — so the shape had to exist before that entry could be written.
+
+So the file grew one level: `"*"` is the flow for any type not named, a named type overrides it
+*moment by moment*, and the flat shape still means one flow for everything. Three things follow
+from that choice. Overriding per moment rather than per map keeps the two flows sharing what
+they agree on, which is most of it — at the cost of one new piece of vocabulary, an entry that
+is present and empty, which is how a type opts out of a moment the fallback moves. The shape is
+detected from the file's own values rather than a version key, so the file that existed before
+this still parses and a file holding both shapes is a startup failure rather than a guess. And
+which flow applies is resolved from the issue the moment *lands on*, not the labelled one, which
+is the only reading consistent with "what moves is what the run implements".
+
+The type names are the one part of the file that cannot be checked against the file itself, and
+they get a warning rather than the startup failure a misspelled moment gets. The asymmetry is
+deliberate: a moment is wrong on its face, offline and forever, while an issue type is only
+wrong relative to a Jira that has to be asked — and a watcher that refuses to start because a
+permissions hiccup lost it the answer would be trading a silent override for a dead factory.
+
 Two consequences of putting the map behind the adapter rather than on the port. The map is
 additive to the labels, not a replacement: with it empty the Jira mirror is byte-for-byte the
 labels-first one, which is what makes filling it in safe. And `shipped` gets the last word — the

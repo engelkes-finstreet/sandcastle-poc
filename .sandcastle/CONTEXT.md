@@ -35,6 +35,16 @@ fires. Optional entry by entry and absent by default, so the Jira mirror is labe
 team fills it in. Only the Jira adapter has one.
 _Avoid_: workflow config — the workflow is Jira's, and the map only names moves inside it
 
+**Flow**:
+One issue type's workflow, as the transition map sees it: the moments named under `"Sub-task"`, or
+under `"*"` for every type not named. A Jira workflow scheme binds a workflow per issue type, so
+ESCB has two — they use the same words for the two buttons the map fills in today, so the committed
+file is the flat single-flow shape, and they diverge after In CodeReview, which is where a flow per
+type will be needed. Which flow a moment uses is decided by the type of the issue it lands on,
+which for a scoped story is the subtask's, not the story's.
+_Avoid_: workflow (Jira's word for the whole graph, of which a flow is only the moments we name),
+map per type (there is one map file; a flow is a section of it)
+
 **Subtask rule**:
 `jira-subtasks.json`: the committed, per-*repository* file saying which of a story's subtasks this
 golem implements — `mine` to work, `others` to leave alone, matched against subtask summaries. A
