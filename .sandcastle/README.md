@@ -74,6 +74,7 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 ├── .env          the sandbox's secrets — forwarded into the container, gitignored
 ├── host.env      the watcher's own config — never forwarded, gitignored
 ├── jira-transitions.json    moment → Jira transition, when the tracker is Jira
+├── jira-subtasks.json       which subtask of a story is this repository's work
 └── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
 ```
 
@@ -90,7 +91,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `phases.mts` | the agent runs, and how a container is configured for them |
 | `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
 | `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
-| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, and the transition map — see below |
+| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, the transition map, and the subtask rule that decides which half of a story this repository implements — see below |
 | `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
@@ -316,10 +317,12 @@ Environment variables, all optional:
 Every one of these can be set in `.sandcastle/host.env` instead, which is the usual place; the
 shell overrides it for a single run.
 
-One piece of configuration is deliberately *not* an environment variable:
-`.sandcastle/jira-transitions.json`, which maps lifecycle moments to Jira workflow transitions.
-Which transitions a project's workflow offers is a property of the project, not of the shell
-that starts the watcher, so it is committed and reviewable — see below.
+Two pieces of configuration are deliberately *not* environment variables, and both are
+committed, reviewable files under `.sandcastle/`. `jira-transitions.json` maps lifecycle moments
+to Jira workflow transitions; `jira-subtasks.json` says which subtask of a story this repository
+implements. Which transitions a project's workflow offers is a property of the project, and which
+discipline a golem writes is a property of the repository it is pointed at — neither is a property
+of the shell that starts the watcher. Both are described below.
 
 ### Jira as the tracker
 
@@ -331,6 +334,11 @@ there the life is the one described above — the branch, the plan pull request,
 comments are flattened out of Jira's document format and injected into the prompts as
 `{{ISSUE_TEXT}}`, same as GitHub issue text is.
 
+One thing about the intake is not a straight translation of GitHub's, because ESCB stories are
+not shaped like GitHub issues: a story labelled here is usually split into a `[FE]` subtask and a
+`[BE]` one, and only one of them is this repository's work. Which one, and what happens to the
+other, is the subtask rule below.
+
 What Jira sees back is deliberately thin — links and state, never prose:
 
 - the same three labels the GitHub adapter uses (`Sandcastle`, `Sandcastle:awaiting-approval`,
@@ -340,6 +348,10 @@ What Jira sees back is deliberately thin — links and state, never prose:
 - one comment when the pull request merges (Jira has no `Closes` clause, so the `shipped`
   moment does the closing work a GitHub issue gets for free) or when the watcher stops
   tracking the issue, and the trigger label comes off with it.
+
+The labels and comments land on the labelled issue, which is where whoever labelled it is
+looking. Workflow transitions, when they are configured, land on whatever the run is actually
+implementing — the subtask, on a story that has one. See both sections below.
 
 Branch names, pull request titles and commit refs carry the key bare — `ESCB-123`, never
 `#ESCB-123` — which is what Jira's development panel matches, so the branch and pull request
@@ -351,6 +363,101 @@ tracker credential may enter the sandbox; `src/env.mts` refuses to start the wat
 listed there, and the smoke test asserts their absence the same way it does `GH_TOKEN`'s. Mint the token at id.atlassian.com → Security → API tokens (it authenticates as
 you; a service account is a recorded follow-up). With Jira selected and either credential
 missing or rejected, the watcher refuses to start and says what to fix.
+
+#### Which subtask of a story is this repository's work
+
+An ESCB story is not one piece of work. It is written as one issue with a `[FE]` subtask and a
+`[BE]` subtask under it, and those two are *different repositories*: the frontend golem must
+implement the frontend subtask, the backend golem the backend one, and neither may implement the
+story whole. The label, though, goes on the story — one label, on the thing a product owner is
+looking at — so the golem has to work out which half of it is its own.
+
+That is **`.sandcastle/jira-subtasks.json`**, committed, and shipped filled in for this
+repository:
+
+```json
+{
+  "mine": "[FE]",
+  "others": ["[BE]"]
+}
+```
+
+`mine` marks the subtasks to work on and `others` marks the ones to leave alone. Both are matched
+anywhere in the subtask's summary, ignoring case — `[FE]` finds `[CB][FE] - the login screen` —
+because what a team has here is a naming convention, not a Jira field. Nothing but this file
+needs changing for the backend golem: `{ "mine": "[BE]", "others": ["[FE]"] }`, in the backend
+repository.
+
+Given a labelled story, the rule has three answers, and the third is the one it exists for:
+
+| The story | What happens |
+|---|---|
+| has an open `[FE]` subtask | **that subtask is the work.** The prompts get the story *and* the subtask, with the subtask marked as the scope and the rest marked as somebody else's. Two `[FE]` subtasks are both in scope — taking only the first would silently drop the second, and nothing would ever come back for it |
+| has no `[FE]` subtask, but has a `[BE]` one — or its `[FE]` subtask is already **done** | **the story is left alone.** It is not in this golem's queue, its label stays exactly where it is, and a line in the log says which story and why |
+| has no subtask this rule recognises, or no subtasks at all | **the issue itself is the work**, exactly as it was before this existed |
+
+The label staying on is the part worth being deliberate about: it is the intake for *every* golem
+watching this project, so a frontend golem taking it off a backend story would be dropping
+somebody else's work on their behalf. Nothing starves for it either — the watcher only ever
+starts the *first* issue of its queue, and a story that is not in the queue cannot hold up the
+ones that are.
+
+What the agent is handed looks like this — one block of text, the scope stated before anything
+else, and every section that is only context labelled as only context:
+
+```
+**Scope: EBS-83.** This story is split into subtasks and that one is this repository's share of
+it — plan and implement it and nothing else. …
+
+### The story: EBS-81 — [CB] - Golem test story
+
+This is a test story to confirm the Jira connection is working in the poc golem.
+
+### Your scope: EBS-83 — [CB][FE] - This is the FE subtask
+
+…
+
+### Not your scope
+
+Another repository's golem — or a colleague — implements these. Do not implement them here. …
+
+- EBS-82 — [CB][BE] - this is an example BE subtask — To Do
+```
+
+Four more things worth knowing:
+
+- **The story's text always comes along.** A subtask's own body is usually one line; the
+  requirement is written on the story. So is every comment. The scope narrows what the agent
+  *does*, never what it is allowed to read.
+- **Label a subtask directly and that works too**, on any project, rule or no rule: the golem
+  takes the subtask as the work and pulls its parent story in as context, plus a list of its
+  siblings. It is the smaller-grained way to use this — one branch and one pull request per
+  subtask instead of per story — and it is what to reach for if a story's two halves need to be
+  planned separately. It is also the shape to use when a frontend golem and a backend golem watch
+  the same Jira project: label **both** subtasks, and each golem takes its own and leaves the
+  other alone, because the rule reads the labelled issue's own summary as well as its subtasks'.
+  Labelling the story instead gives the first golem to pick it up the label swap, and the second
+  golem then sees nothing to do — see `docs/adr/0010`.
+- **Transitions follow the scope.** With `jira-transitions.json` filled in, it is the *subtask*
+  that moves from column to column, not the story — because the subtask is what a developer
+  would move, and stories are what subtasks add up to. Every log line names the key it moved.
+- **Emptying `mine`, or deleting the file, turns all of this off**: every run is scoped to the
+  labelled issue itself, which is what a project not using discipline subtasks wants and what
+  every deployment did before this existed. A malformed file, an unknown key, or an `others`
+  list with an empty `mine` is a startup failure naming the file — the same rule the transition
+  map follows, for the same reason.
+
+To try it without a watcher running, `pnpm sandcastle:jira-smoke` prints the rule under the
+banner and then the decision it reached for every labelled story:
+
+```
+Jira: subtasks — working the "[FE]" subtask of a labelled story, leaving "[BE]" to another
+repository; a story with neither is worked whole.
+  jira: EBS-81 → EBS-83 — the "[FE]" work on it (leaving EBS-82)
+  jira: EBS-90 left for another repository's golem — it has no "[FE]" subtask, and EBS-91
+        belongs to another repository
+  queue: 1 issue(s) labelled "Sandcastle", not Done, and this repository's work
+```
 
 #### The transition map
 
@@ -393,7 +500,7 @@ The six moments are the watcher's, and they are the same six on every tracker:
 | `stopped` | the watcher let the issue go — abandoned, blocked, rounds spent, closed unmerged |
 
 Every entry is optional, and so is the file: with all six empty, or the file deleted, the mirror
-is labels only and Jira behaves exactly as it did before this existed. Four things worth
+is labels only and Jira behaves exactly as it did before this existed. Five things worth
 knowing:
 
 - **Names are resolved at the moment, not at startup.** Jira offers only the transitions the
@@ -411,6 +518,11 @@ knowing:
   `Sandcastle` label comes off with a comment (as it always did) but the `picked-up` transition
   stands: the map has no reverse. Re-adding the label picks the issue up again, and the
   `picked-up` transition its status no longer offers is skipped with a log line.
+- **What moves is what the run implements.** On a story scoped to a `[FE]` subtask by
+  `jira-subtasks.json`, every one of these moments transitions the *subtask*: it is the thing a
+  developer would move, and a story that jumped to In Review while both its halves sat in To Do
+  would be a lie on the board. Where there is no subtask to scope to, the labelled issue moves,
+  as it always did. Each log line names the key it moved, so the two cases are never a guess.
 
 Startup prints which moments are configured, right before the `Watching …` banner, so the answer
 to "will this move anything" is in the first lines of the log.
@@ -487,6 +599,12 @@ act on ("add a `README` line documenting `pnpm sandcastle:smoke`") rather than a
 agent that declines to plan releases the issue right after the pickup, and every later moment
 goes untested. Label it **`Sandcastle`**.
 
+To exercise the subtask rule as well, make it a story with two subtasks — one `[FE]`, one `[BE]`
+— and put the actual task in the `[FE]` one. Then the pickup line names which subtask it took,
+the plan should mention the `[BE]` subtask only as somebody else's, and the transitions in step 6
+land on the subtask rather than on the story. A second scratch story with a `[BE]` subtask and no
+`[FE]` one proves the other half: it should never be picked up, and it should keep its label.
+
 **5. Start the watcher.** A short poll and — until this branch is on `main` — the branch the
 factory is running from as the base:
 
@@ -497,11 +615,12 @@ SANDCASTLE_BASE=origin/sandcastle/epic-10 \
 pnpm sandcastle
 ```
 
-The first three lines answer everything about configuration:
+The first four lines answer everything about configuration:
 
 ```
 Jira: authenticated as … against https://finstreet-team.atlassian.net.
 Jira: transitions — picked-up → "Start work".
+Jira: subtasks — working the "[FE]" subtask of a labelled story, leaving "[BE]" to another repository; a story with neither is worked whole.
 Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandcastle".
 ```
 
@@ -509,7 +628,7 @@ Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandc
 
 | After | The log says | Check in Jira |
 |---|---|---|
-| pickup | `jira: ESCB-123 → "Start work" (picked-up)` | the issue moved column, and its History tab records it |
+| pickup | `jira: ESCB-123 → ESCB-124 — the "[FE]" work on it`, then `jira: ESCB-124 → "Start work" (picked-up)` | the **subtask** moved column, and its History tab records it. Where the story has no `[FE]` subtask, both lines name the story instead |
 | the plan is posted | `jira: … (awaiting-approval)`, if configured | `Sandcastle` swapped for `Sandcastle:awaiting-approval`, a comment with the pull request link, and the branch and PR under **Development** — that panel is Jira matching the bare key, with no integration on our side |
 | you comment `approve` | `jira: … (implementing)`, if configured | the column again |
 | you merge | `jira: … (shipped)`, if configured | the column, **one** comment, and — the thing worth confirming — that the `stopped` moment one second later moved *nothing* |
