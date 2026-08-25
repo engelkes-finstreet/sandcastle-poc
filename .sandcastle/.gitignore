@@ -1,5 +1,11 @@
 .env
+host.env
 logs/
 worktrees/
 state/
 watchtower/
+
+# The two templates are the tracked half of the pair, and the root .gitignore's
+# `.env*` would otherwise swallow .env.example. This file is deeper, so it wins.
+!.env.example
+!host.env.example

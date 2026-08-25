@@ -1,9 +1,15 @@
+// First, and for its side effect: env.mts fills process.env from
+// .sandcastle/host.env before any of the reads below happen, and refuses to let
+// the process start if a host-only key has been left in the sandbox's .env. See
+// that file for the two-file rule and why the names are what they are.
+import "./env.mts";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Every knob the watcher has, and every path it touches. Imported by all the
-// other modules; imports nothing but node builtins itself, so it stays the one
-// file you can read to know how a run is configured.
+// other modules; imports nothing but node builtins and env.mts itself, so it
+// stays the one file you can read to know how a run is configured — with
+// host.env as the other half of the answer to where a value came from.
 
 export const LABEL = "Sandcastle";
 export const AWAITING_LABEL = "Sandcastle:awaiting-approval";
@@ -71,9 +77,10 @@ export const TRACKER = process.env.SANDCASTLE_TRACKER ?? "github";
  * trackers/jira.mts validates the two credentials and exits loudly if they are
  * missing or rejected.
  *
- * From the host shell, deliberately **never** from .sandcastle/.env: every key
- * in that file is forwarded into the container, and no tracker credential may
- * enter the sandbox — the same rule that retired GH_TOKEN. The token is a Jira
+ * From .sandcastle/host.env or the shell, deliberately **never** from
+ * .sandcastle/.env: every key in that file is forwarded into the container, and
+ * no tracker credential may enter the sandbox — the same rule that retired
+ * GH_TOKEN, and the one env.mts refuses to start without. The token is a Jira
  * Cloud personal API token (id.atlassian.com → Security → API tokens), used
  * with the email as basic auth against the REST v3 API.
  */

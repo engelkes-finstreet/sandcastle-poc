@@ -71,7 +71,8 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 ├── prompts/      what the agent is told, one file per phase
 ├── docs/adr/     why it behaves the way it does
 ├── Dockerfile    the image every run starts from
-├── .env          secrets, gitignored — see below
+├── .env          the sandbox's secrets — forwarded into the container, gitignored
+├── host.env      the watcher's own config — never forwarded, gitignored
 ├── jira-transitions.json    moment → Jira transition, when the tracker is Jira
 └── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
 ```
@@ -94,6 +95,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
 | `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
 | `config.mts` | every knob, every path, every marker. Start here |
+| `env.mts` | the two env files and the rule that keeps them apart — imported first by `config.mts`, for its side effect |
 | `types.mts` | the shapes that travel between the modules, `Tracked` above all |
 | `shell.mts` | `git`, `gh`, and the timestamped log line |
 | `shutdown.mts` | Ctrl-C, and the sleep that returns early for it |
@@ -126,28 +128,63 @@ ignores something you thought you told it.
 > The sandcastle CLI swallows each build step's stderr, so a failure can look like success.
 > When something breaks, get the real error from `docker build --progress=plain .sandcastle`.
 
-**2. Fill in `.sandcastle/.env`** (gitignored, never commit it):
+**2. Fill in the two env files.** Both are gitignored; both have a tracked `.example` next to
+them, so this step is two copies and a fill-in:
+
+```bash
+cp .sandcastle/.env.example      .sandcastle/.env
+cp .sandcastle/host.env.example  .sandcastle/host.env
+```
+
+They are split by **which side of the container boundary reads them**, and the split is
+enforced at startup rather than merely documented — see
+[ADR 0009](docs/adr/0009-two-env-files-one-for-each-side.md).
+
+**`.sandcastle/.env` — the sandbox's.** Every key listed here is forwarded into the container.
 
 | Key | |
 |---|---|
 | `CLAUDE_CODE_OAUTH_TOKEN` | from `claude setup-token` on your host — lets the agent use your subscription |
+| `NPM_AUTH_TOKEN` | GitHub Packages token (`read:packages`) for `@finstreet/*` — `pnpm install` in the container 401s without it |
+| `FINSTREET_MCP_TOKEN` | bearer token for the `finstreet-mcp` server the `finstreet-fe` plugin carries — without it the server is configured but never connects |
+
+A key listed with an **empty value** falls back to the host shell's value, so `NPM_AUTH_TOKEN=`
+is enough when your `~/.zshrc` already exports it — the secret then lives in one place. A key
+that is *absent* from the file is not forwarded at all, whatever the shell says.
+
+The file's unhelpful name is not ours to pick: `@ai-hero/sandcastle` resolves it as
+`<repo>/.sandcastle/.env` with no option to point it elsewhere. Read it as an allowlist of what
+the agent gets to see.
+
+**`.sandcastle/host.env` — the watcher's.** Read on the host and forwarded nowhere.
+
+| Key | |
+|---|---|
+| `SANDCASTLE_TRACKER` | optional, `github` (default) or `jira` |
+| `JIRA_BASE_URL`, `JIRA_PROJECT`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | the Jira site, project key and credentials, when the tracker is `jira` |
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
 | `SLACK_MENTION` | optional, your Slack **member ID** (`U0123…`) — who gets @-mentioned when it is your turn. A user group (`S0123…`) or the literal `here`/`channel` also work |
 | `WATCHTOWER_URL` | optional, the Watchtower api's origin (`https://…`) — both this and the key come from its settings page |
 | `WATCHTOWER_API_KEY` | optional, `wt_…`, this repository's Project key. Shown once, at creation, and stored only as a hash |
-| `NPM_AUTH_TOKEN` | GitHub Packages token (`read:packages`) for `@finstreet/*` — `pnpm install` in the container 401s without it |
-| `FINSTREET_MCP_TOKEN` | bearer token for the `finstreet-mcp` server the `finstreet-fe` plugin carries — without it the server is configured but never connects |
 
-Every key in this file is forwarded into the container. A key listed with an **empty value**
-falls back to the host shell's value, so `NPM_AUTH_TOKEN=` is enough when your `~/.zshrc`
-already exports it — the secret then lives in one place. A key that is *absent* from the file
-is not forwarded at all, whatever the shell says.
+The shell still wins over this file, so `SANDCASTLE_POLL_SECONDS=10 pnpm sandcastle` changes one
+run without editing anything.
 
-Note what is *not* in the list: no GitHub credential ever enters the container. The host reads
+Per checkout rather than per machine, which is what makes **more than one golem on one machine**
+work: a second clone gets its own `host.env` — its own project, channel and board — with nothing
+in `~/.zshrc` that both would have to share.
+
+**Putting a key in the wrong file is a startup error**, naming the key and the file to move it
+to. Both directions are caught, because both are invisible downstream: a tracker credential left
+in `.sandcastle/.env` gets forwarded into the next container and *nothing goes wrong*, and a
+`NPM_AUTH_TOKEN` stranded in `host.env` surfaces minutes later as `ERR_PNPM_FETCH_401` inside an
+install.
+
+Note what is in *neither* list: no GitHub credential ever enters the container. The host reads
 the issue — body and comments — with your own `gh` login and injects it into the prompts as
-`{{ISSUE_TEXT}}`, frozen at container start. Do not add a `GH_TOKEN` key here; the sandbox has
-no legitimate use for one.
+`{{ISSUE_TEXT}}`, frozen at container start. Do not add a `GH_TOKEN` key to `.sandcastle/.env`;
+the sandbox has no legitimate use for one.
 
 Slack is optional; without it the watcher logs `Slack notifications off` and runs normally. So is
 Watchtower — see below.
@@ -225,7 +262,7 @@ way to tell the package is installed.
 
 **Onboarding.** On Watchtower's `/settings/projects`, create a Project for this repository. It
 mints an API key, shows it exactly once, and gives you two lines. Paste them into
-`.sandcastle/.env` and restart the watcher:
+`.sandcastle/host.env` and restart the watcher:
 
 ```
 WATCHTOWER_URL=http://localhost:3101
@@ -270,11 +307,14 @@ Environment variables, all optional:
 | `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
 | `JIRA_BASE_URL` | `https://finstreet-team.atlassian.net` | the Jira Cloud site, when the tracker is `jira` |
 | `JIRA_PROJECT` | `ESCB` | the Jira project whose issues feed the factory |
-| `JIRA_EMAIL`, `JIRA_API_TOKEN` | — | Jira credentials, **host shell only — never `.sandcastle/.env`**. See below |
+| `JIRA_EMAIL`, `JIRA_API_TOKEN` | — | Jira credentials, **`host.env` or the shell — never `.sandcastle/.env`**. See below |
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
-| `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `.env` |
-| `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `.env` |
+| `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `host.env` |
+| `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `host.env` |
+
+Every one of these can be set in `.sandcastle/host.env` instead, which is the usual place; the
+shell overrides it for a single run.
 
 One piece of configuration is deliberately *not* an environment variable:
 `.sandcastle/jira-transitions.json`, which maps lifecycle moments to Jira workflow transitions.
@@ -305,10 +345,10 @@ Branch names, pull request titles and commit refs carry the key bare — `ESCB-1
 `#ESCB-123` — which is what Jira's development panel matches, so the branch and pull request
 appear on the issue with no factory-side integration at all.
 
-**Credentials: `JIRA_EMAIL` and `JIRA_API_TOKEN`, from the host shell — never from
-`.sandcastle/.env`.** Every key in that file is forwarded into the container, and no tracker
-credential may enter the sandbox; the smoke test asserts their absence, the same way it does
-`GH_TOKEN`'s. Mint the token at id.atlassian.com → Security → API tokens (it authenticates as
+**Credentials: `JIRA_EMAIL` and `JIRA_API_TOKEN`, from `.sandcastle/host.env` or the shell —
+never from `.sandcastle/.env`.** Every key in that file is forwarded into the container, and no
+tracker credential may enter the sandbox; `src/env.mts` refuses to start the watcher if one is
+listed there, and the smoke test asserts their absence the same way it does `GH_TOKEN`'s. Mint the token at id.atlassian.com → Security → API tokens (it authenticates as
 you; a service account is a recorded follow-up). With Jira selected and either credential
 missing or rejected, the watcher refuses to start and says what to fix.
 
@@ -381,12 +421,16 @@ Nothing below needs a second repository or a second Jira project. It does need a
 willing to have an agent read and a pull request you are willing to throw away, so use a scratch
 issue in ESCB — the transitions this exercises are the real ones on the real workflow.
 
-**1. Credentials, in the shell that will start the watcher.** Never in `.sandcastle/.env`:
+**1. Credentials, in `.sandcastle/host.env`.** Never in `.sandcastle/.env`:
 
-```bash
-export JIRA_EMAIL="you@finstreet.de"
-export JIRA_API_TOKEN="…"          # id.atlassian.com → Security → API tokens
 ```
+SANDCASTLE_TRACKER=jira
+JIRA_EMAIL=you@finstreet.de
+JIRA_API_TOKEN=…                   # id.atlassian.com → Security → API tokens
+```
+
+Exporting them in the shell that starts the watcher works too, and wins over the file — but the
+file is per checkout, which is what a second golem on the same machine needs.
 
 Then prove them before involving the watcher at all:
 
@@ -808,7 +852,9 @@ read it.
 | `The watcher needs an authenticated gh` | `gh auth login` on the host. The host is the only place a GitHub credential exists — the container gets none. |
 | Slack says `not_in_channel` | `/invite @YourApp` in the target channel. |
 | Slack says `invalid_auth` | Wrong or revoked token, or a user token (`xoxp-`) where a bot token (`xoxb-`) is needed. |
-| `pnpm install` fails with `ERR_PNPM_FETCH_401` | `NPM_AUTH_TOKEN` did not reach the container. It must be listed as a key in `.sandcastle/.env` — an export in your shell alone is not forwarded. |
+| `pnpm install` fails with `ERR_PNPM_FETCH_401` | `NPM_AUTH_TOKEN` did not reach the container. It must be listed as a key in `.sandcastle/.env` — an export in your shell alone is not forwarded, and `host.env` is never forwarded at all. |
+| Startup says a key `is in .sandcastle/.env` and must move | A host-side key (`JIRA_`, `SLACK_`, `WATCHTOWER_`, `SANDCASTLE_`) is in the file that gets forwarded into the container. Move it to `.sandcastle/host.env`. If it is a credential, rotate it — the guard stops the next run, not the ones already gone. |
+| Startup says a key `is in .sandcastle/host.env` and will not reach the agent | The reverse: a sandbox credential in the file that is never forwarded. Move it to `.sandcastle/.env`. |
 | `claude mcp list` shows `finstreet-mcp` failing | `FINSTREET_MCP_TOKEN` did not reach the container — list it as a key in `.sandcastle/.env`. The URL resolving means the plugin installed; only the credential is missing. |
 | The agent never uses a skill or an MCP tool | Check the startup command output in the log. `Plugin "x" not found in marketplace "y"` means the catalog was not fetched before the install — almost always because the two were split into separate hooks, which run concurrently. |
 | The watcher ignores an approval you left | Check `.sandcastle/state/`. No file means nothing is polling that pull request — the startup log lists issues in that state. Close the PR and re-add the **Sandcastle** label. |

@@ -30,8 +30,8 @@ import type { Issue, Outcome, Tracked } from "./types.mts";
 // every event body is built inside `report`'s guard, and every file it touches is
 // best-effort.
 //
-// Setup is two lines in .sandcastle/.env, minted by Watchtower's settings page
-// when the Project is created:
+// Setup is two lines in .sandcastle/host.env, minted by Watchtower's settings
+// page when the Project is created:
 //
 //   WATCHTOWER_URL=https://…
 //   WATCHTOWER_API_KEY=wt_…
@@ -42,10 +42,13 @@ import type { Issue, Outcome, Tracked } from "./types.mts";
 const WATCHTOWER = join(SANDCASTLE, "watchtower");
 
 const emitter = createEmitter({
-  // The package lives in node_modules and cannot find the watcher's .env for
-  // itself. Same file slack.mts reads, and read for the same reason: it is the
-  // checked-out default that a shell variable may override for one run.
-  envFile: new URL("../.env", import.meta.url),
+  // The package lives in node_modules and cannot find the watcher's env file for
+  // itself. host.env, not .sandcastle/.env: a Project's URL and key are the
+  // host's — one golem per checkout, one Project per golem — and the sandbox has
+  // no business being handed either. Read for the same reason slack.mts's keys
+  // are: it is the checked-out default that a shell variable may override for
+  // one run.
+  envFile: new URL("../host.env", import.meta.url),
   // Inside .sandcastle/ rather than the process's cwd, which for the watcher is
   // the repository it is working in — an untracked directory appearing at the
   // root mid-run is something a `git add -A` can swallow.
