@@ -440,14 +440,23 @@ export const implementPlan = async (tracked: Tracked, approval: string): Promise
  * but for this one it is a requirement rather than a saving: the run that reviews
  * must not be the run that wrote the code. An agent reading its own conversation
  * agrees with itself, which is the same as no review at all — so the reviewer gets
- * the diff, the approved plan and the repo's skills, and nothing else.
+ * the diff, the spec, and the repo's skills, and nothing else.
+ *
+ * The spec is three things, because the prompt reviews the diff along a Spec axis and
+ * all three bind it: the issue as filed (what was wanted), the plan (the approved
+ * contract for how), and the approval comment (which overrides the plan wherever the
+ * two disagree). Without that last one the reviewer reports `approve, but use the
+ * shared ConfirmationModal` as scope creep — a human's decision filed as a defect.
  *
  * Runs after the push, not before it. The implementation is finished either way,
  * and a reviewer that stood between working code and the remote would turn every
  * one of its own failures into a lost pull request. Findings are a comment; what
  * to do about them is a human's call.
  */
-export const reviewCode = async (tracked: Tracked): Promise<CodeReview | undefined> => {
+export const reviewCode = async (
+  tracked: Tracked,
+  approval: string,
+): Promise<CodeReview | undefined> => {
   const { issue, branch } = tracked;
   log(`  reviewing ${tracker.issueRef(issue.key)} on ${branch} with model ${REVIEW_MODEL}`);
 
@@ -456,9 +465,12 @@ export const reviewCode = async (tracked: Tracked): Promise<CodeReview | undefin
     name: `issue-${issue.key}-code-review`,
     promptFile: CODE_REVIEW_PROMPT,
     promptArgs: {
-      ISSUE_REF: tracker.issueRef(issue.key),
-      ISSUE_TITLE: issue.title,
+      // The same three issue values every other phase is handed, from the one place
+      // that renders them — the reviewer's Spec axis reads the issue itself, not only
+      // the plan that was made from it.
+      ...(await issuePromptArgs(issue)),
       PLAN: tracked.plan,
+      APPROVAL: approval,
       BASE: BASE_BRANCH,
     },
   });

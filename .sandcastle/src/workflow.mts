@@ -277,7 +277,7 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
   // request — switching it on cannot turn phase 5 into a fix loop. That is the
   // line `0002` drew and `0006` keeps.
   //
-  // await codeReview(shipped);
+  // await codeReview(shipped, decision.comment);
   // ------------------------------------------------------------------------
 
   return "worked";
@@ -294,16 +294,20 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
  * What it must never do is fail quietly. Silence in the thread is
  * indistinguishable from a clean review, so every way out of here says something.
  *
+ * Takes the approval comment as well as the tracked issue: the review's Spec axis is
+ * held to the issue, the plan *and* what the human said when approving it, because an
+ * approval that overrode the plan on a point is spec rather than deviation.
+ *
  * **Currently switched off, and therefore currently uncalled** — see the commented
  * call in `implement` above for what to uncomment and why it is commented. It is
  * exported like this module's other entry points rather than left local, which is
  * also what keeps `noUnusedLocals` from failing the typecheck while it is parked.
  */
-export const codeReview = async (tracked: Tracked) => {
+export const codeReview = async (tracked: Tracked, approval: string) => {
   let review: CodeReview | undefined;
 
   try {
-    review = await reviewCode(tracked);
+    review = await reviewCode(tracked, approval);
   } catch (error) {
     if (controller.signal.aborted) {
       log(`  cancelled — ${tracker.issueRef(tracked.issue.key)} is pushed and ready, but unreviewed.`);

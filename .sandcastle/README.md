@@ -113,7 +113,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `plan-issue.md` | phase 1: read the issue, run `kickoff`, return its task list as the plan, change nothing |
 | `implement-plan.md` | phase 3: build the approved plan, and say how to test it by hand |
 | `follow-up.md` | phase 5: make the change a human asked for on a shipped diff, and nothing else |
-| `code-review.md` | phase 4: read the pushed diff and report on it, in a session that did not write it. Switched off — see below |
+| `code-review.md` | phase 4: review the pushed diff along two axes — Standards and Spec — in a session that did not write it. Switched off — see below |
 | `smoke-test.md` | eleven checks proving the sandbox works at all |
 
 A prompt is loaded from disk on every run, so editing one changes the next run with no restart.
@@ -835,7 +835,7 @@ doubles the container time per issue before anyone has seen the first pull reque
 
 | | |
 |---|---|
-| `src/workflow.mts` | `await codeReview(shipped);` in `implement`, under the `phase 4, switched off for now` banner |
+| `src/workflow.mts` | `await codeReview(shipped, decision.comment);` in `implement`, under the `phase 4, switched off for now` banner |
 | `src/notify.mts` | in `announceAttempt`, prefix the `revise` line with the sentence commented above it |
 
 Both are commented in place with that instruction, so neither is findable only from here.
@@ -952,8 +952,29 @@ builds exactly the same thing.
 **The reviewer must not be the author.** Phase 4 is a fresh session for a second reason on top
 of cost: an agent handed its own conversation agrees with itself, and a review that always
 approves is worse than no review, because it looks like one. So the reviewer gets the diff, the
-approved plan and the repo's skills, and nothing else. It reads the code the way you would:
-cold.
+spec — the issue as filed, the approved plan, and what you said when you approved it — and the
+repo's skills, and nothing else. It reads the code the way you would: cold.
+
+**It reviews along two axes, and never merges them.** *Standards* asks whether the code follows
+how this repo writes code; *Spec* asks whether it does what the issue asked, and only that. A
+change can pass either one while failing the other — every convention honoured on the wrong
+feature, or exactly the right feature built against none of them — and in a single list the
+fuller axis hides the emptier one, which is usually where the expensive problem is. So each axis
+is a **subagent of its own, in its own context, dispatched in parallel**, and the run that started
+them aggregates rather than reviews. The two sections are reported side by side and nothing is
+promoted across them. The one place they meet is the verdict, because Slack has room for one
+word: a blocker on either axis is `CONCERNS`.
+
+The Standards axis is where the fan-out is, and it is bounded on purpose. One subagent carries the
+repo checklist, the Fowler smell baseline, and the light skills that are a single question each
+(`path-resolver`, `routes`, `loading`, `mock-api`). Up to **three** more take a heavy skill each —
+`form`, `ui`, `page`, `secure-fetch`, `modal`, `list-actions`, `inquiry-process`, `task-group`,
+`e2e-test` — chosen by what the diff is mostly made of and by the skills the plan named. A skill
+like `form` is some four thousand lines across the files its SKILL.md points at: a session that has
+already read the diff will skim that, and a subagent reads it properly in a context it then throws
+away. Past the third, though, the findings are the third's said differently, and each of these
+agents re-reads the diff to earn its own — hence three to five subagents per review rather than one
+per skill the diff grazes.
 
 It runs on `sonnet` rather than `opus`, and that is not only about cost. Reviewing is a bounded
 reading task against a diff that already compiles, and the judgement it needs is in the skills
