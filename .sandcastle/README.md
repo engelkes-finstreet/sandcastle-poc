@@ -1009,10 +1009,31 @@ session runs to completion with zero skills and zero MCP servers, which reads as
 ignored its tools rather than as missing setup. So `src/sandbox.mts` derives the work from that same
 file — fetch each marketplace's catalog, then `claude plugin install … -s user`. Installing at
 user scope keeps the container's own `enabledPlugins` out of the tracked settings the agent
-might commit. It costs about 10 seconds and 14MB per run, and adding a plugin to
-`.claude/settings.json` is the only edit needed to get it into the sandbox. `playwright` is the
-one exception, skipped by name in `src/sandbox.mts`: its MCP server connects and then fails on first
-use, because the image has no browsers.
+might commit.
+
+**What a run installs is an allowlist, not everything you have enabled.** `SANDBOX_PLUGINS` in
+`src/sandbox.mts` names it in full — `finstreet-dev` and `finstreet-fe` — and settings.json is
+consulted only for where those marketplaces live. The two directions fail differently, which is
+the whole argument: a plugin the sandbox wants and does not get is an agent quietly ignoring this
+repo's conventions, while a plugin it gets and does not want can take the run down in setup,
+before the agent starts. The second is not hypothetical. Enabling one personal plugin from
+`claude-plugins-official` broke every phase twice over — first on a marketplace clone the
+container cannot authenticate over SSH, then on one too large for the CLI's 120-second default.
+Under a list of exceptions that is what a local convenience costs by default; under an allowlist a
+plugin nobody named cannot reach a container at all.
+
+So `playwright` (its MCP server connects and then fails on first use — the image has no browsers)
+and `mattpocock-skills` (workflow skills for a person at a terminal) are simply absent rather than
+excluded by name. The price of the allowlist is a second edit: a plugin this repo's *runs* need is
+enabled in `.claude/settings.json` **and** named in `SANDBOX_PLUGINS`. Two entries that change
+rarely is a cheap place to pay it, and forgetting the second half is visible in the log as a run
+whose plugin chain is shorter than you expected.
+
+A plugin named in `SANDBOX_PLUGINS` and explicitly `false` in settings.json is a contradiction,
+not a default, so it throws at startup rather than resolving itself silently. The SSH and clone
+timeout wiring (`url."https://github.com/".insteadOf`, `CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS`) stays
+as insurance: no allowlisted plugin comes from the marketplace that failed that way, but the first
+entry from any other one brings the shorthand clone straight back.
 
 **Startup commands run in parallel, so ordering lives inside them.** Sandcastle executes
 `onSandboxReady` hooks with `concurrency: "unbounded"`, so two entries are two races, not two
