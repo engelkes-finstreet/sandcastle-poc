@@ -79,8 +79,9 @@ going instead of trying to fix it.
    - `pnpm build` — expected to reach Next's route table.
 
    Quote any error verbatim. That is the most valuable thing this whole smoke test can tell
-   us. The Playwright suite in `e2e/` is deliberately **out of scope**: it needs browsers
-   that are not in this image and a running server.
+   us. The Playwright suite in `e2e/` is deliberately **out of scope**: the image carries
+   chromium for the walkthrough phase, but this run is given neither the application's
+   environment nor a running server.
 9. **Skills and MCP are wired.** Startup commands installed the plugins that
    `.claude/settings.json` enables — that file only *declares* them, and nothing installs
    them on its own, so skills and MCP tools exist here only if those commands worked.

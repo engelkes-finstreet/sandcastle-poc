@@ -43,6 +43,10 @@ PHASE 4 · container: a FRESH session — no memory of the plan or the code — 
    ↓  complexity, this repo's standards, and each part against the skill it should have used
 host: comment with the findings and a verdict   ← it reviews, it never fixes
    ↓  ⚠ SWITCHED OFF right now. See below
+PHASE 6 · container: a FRESH session logs into staging, drives a browser to the pages this
+   ↓  diff touches, and saves a screenshot of each
+host: the shots go on a branch of their own and into the pull request description
+   ↓  ⚠ SWITCHED OFF right now, and its browser step is unwritten. See below
 label swap → `Sandcastle:awaiting-revision`, both watermarks reset
    ↓
 PHASE 5 · you read the shipped code and comment on the pull request
@@ -114,6 +118,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `implement-plan.md` | phase 3: build the approved plan, and say how to test it by hand |
 | `follow-up.md` | phase 5: make the change a human asked for on a shipped diff, and nothing else |
 | `code-review.md` | phase 4: review the pushed diff along two axes — Standards and Spec — in a session that did not write it. Switched off — see below |
+| `walkthrough.md` | phase 6: log into staging, walk to the pages the diff touches, photograph them. Switched off, and **its Step 2 is an unwritten placeholder** — see below |
 | `smoke-test.md` | eleven checks proving the sandbox works at all |
 
 A prompt is loaded from disk on every run, so editing one changes the next run with no restart.
@@ -311,6 +316,7 @@ Environment variables, all optional:
 | `JIRA_EMAIL`, `JIRA_API_TOKEN` | — | Jira credentials, **`host.env` or the shell — never `.sandcastle/.env`**. See below |
 | `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
 | `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
+| `SANDCASTLE_WALKTHROUGH_MODEL` | `sonnet` | the model phase 6 drives the browser on, when phase 6 is on |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `host.env` |
 | `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `host.env` |
 
@@ -856,6 +862,95 @@ no path into phase 5**: its comments carry the `<!-- sandcastle -->` marker, so 
 read them as a change request. Switching phase 4 on cannot turn phase 5 into an agent reviewing
 and then fixing itself — the line `docs/adr/0002-…` drew and `0006` keeps.
 
+### Phase 6 — the walkthrough — is switched off too
+
+After phase 3 pushes, one more container logs into staging, drives a browser to the pages the
+diff touches, saves a PNG of each, and the host puts them in the **pull request description**.
+
+**It is switched off**, like phase 4 and behind it in the queue. What comes first is verifying
+that a simplified flow works end to end through Jira on the new infrastructure, and a third
+container per issue — one that boots the application, logs into staging and drives a browser — is
+the largest new moving part here. Adding it to the run you are still trying to trust makes a
+failure in either harder to read.
+
+It is structurally a twin of phase 4: a fresh session, after the push, read-only, best-effort, no
+return value, unable to hold the branch back. Where it differs is that **it does not have to be a
+stranger to the code to be worth anything**, and that is the reason it exists as its own phase. A
+code review is a judgement, and a judgement from an agent is something a human can over-trust. A
+screenshot is not a judgement. It is a picture of a page, exactly as good taken by the agent that
+wrote the code as by anybody else, and the person who opens it forms their own opinion in a
+second. See `docs/adr/0011-the-walkthrough-is-a-photograph-not-a-verdict.md`.
+
+That asymmetry is in the code, not just in the argument. `walkPages` lists the screenshot
+directory and counts the bytes — the images are found on disk. What the agent *says* only ever
+becomes a caption: a shot it claimed and did not save never appears, and a shot it saved and did
+not caption appears under its own filename.
+
+**To turn it on, uncomment two lines — and write the third thing:**
+
+| | |
+|---|---|
+| `src/workflow.mts` | `await walkthrough(shipped);` in `implement`, under the `phase 6, switched off for now` banner |
+| `src/notify.mts` | in `announceAttempt`, prefix the `revise` line with the phase 6 sentence commented above it |
+| `prompts/walkthrough.md` | Step 2, below — without it the phase runs and photographs nothing |
+
+The first two are commented in place with that instruction, so neither is findable only from here.
+
+**⚠ Step 2 of `prompts/walkthrough.md` is an unwritten placeholder.** Everything around it is
+built and working — chromium in the image, the mount, the staging credentials, the host-side
+pickup, the branch, the body — but *how* an agent should start the app, log in and navigate is
+left to write. Until it is, the prompt tells the run to take no screenshots and report that it
+had no instructions, which lands in Slack as a skipped walkthrough — so turning the phase on
+before writing it buys a container per issue and no pictures. That is deliberate: the one
+outcome that would do real damage is a fabricated screenshot, so the prompt forbids improvising
+one in as many words. `e2e/pages/auth/LoginPage.ts` already has `loginAsCustomer` /
+`loginAsFsp` / `loginAsFspAdmin`, and the credentials come from `E2E_TEST_*` via
+`e2e/utils/test-helpers.ts`, so the instructions have somewhere to start.
+
+**Two things on the host have to be in place**, neither of them checked at startup:
+
+| | |
+|---|---|
+| `pnpm sandcastle:build-image` | the chromium layer is new, so an image built before this phase existed has no browser |
+| `.env`, and `.env.e2e` | read off the host and written into the walkthrough's worktree, exactly as `.npmrc` is. Missing files are a warning at run time, not a refusal to start — `.env.e2e` does not exist in a fresh clone, and without it the `E2E_TEST_*` credentials fall back to placeholders and the login will fail |
+
+**This is the one container trusted with the application's own credentials.** `AUTH_SECRET`,
+`HMAC_SECRET`, the two API base URLs and a test user's password all reach it, because a login
+against a real backend cannot happen otherwise. It is narrower than it sounds: `appEnv` in
+`src/sandbox.mts` is reached only through `SandboxNeeds`, so no other phase's container holds
+these keys at all. The rule that mattered is intact — no tracker credential, ever, so the
+walkthrough can no more reach GitHub than the reviewer can. What makes it acceptable is the
+values themselves: staging, throwaway, rotatable. Nothing enforces that but the comment on
+`appEnv` and this paragraph, and a production value in `.env` would make every walkthrough
+container a place production credentials have been.
+
+**Where the pictures live.** GitHub has no public API for uploading an image to a pull request,
+so a body can only point at something already in the repository. Each issue's shots go on
+`sandcastle/shots/issue-<n>` as a single orphan commit, force-pushed — beside the issue branch
+and deliberately not on it, because the diff somebody is reading has no business carrying half a
+megabyte of PNG. Deleting that branch breaks the images in that one description and nothing else.
+`MAX_SHOTS` (6) and `MAX_SHOT_BYTES` (2MB) in `config.mts` bound what any run may add, and
+anything dropped is said on the pull request rather than dropped quietly.
+
+`attachShots` reads the live body and replaces only its own marked block, so a description you
+have edited by hand survives a second walkthrough.
+
+**Phase 6** ends in one of three ways, and only the first touches the pull request:
+
+| | |
+|---|---|
+| shots attached | The description carries them, and Slack says how many. |
+| shots taken, not attached | The push or the `pr edit` failed. Slack says where the files are on the host instead of claiming they are in the description. |
+| no walkthrough | The run failed, timed out, saved nothing, or had no browser instructions. Said out loud in Slack — a description with no screens is indistinguishable from a phase nobody ran. |
+
+None of them change what happens next, for the same reason none of phase 4's do.
+
+**One gap, worth knowing when you read a timeline.** Every other moment in `notify.mts` speaks
+to Slack and Watchtower together. This one speaks only to Slack: the event catalog in
+`@finstreet/watchtower-golem/events` is a closed union with no `walkthrough.*` in it, and filing
+a screenshot as a neighbouring event would be a lie the dashboard repeats. Closing it is two
+schemas in that package and two `tell` calls here.
+
 **How you review a plan.** Comment on the pull request. `approve`, `approved`, `lgtm`,
 `ship it`, `go ahead`, `looks good` or 👍 at the *start* of the comment means build it. `abandon`,
 `reject`, `cancel` or `stop` means give up. Those two are the only things read here.
@@ -1043,9 +1138,13 @@ container cannot authenticate over SSH, then on one too large for the CLI's 120-
 Under a list of exceptions that is what a local convenience costs by default; under an allowlist a
 plugin nobody named cannot reach a container at all.
 
-So `playwright` (its MCP server connects and then fails on first use — the image has no browsers)
-and `mattpocock-skills` (workflow skills for a person at a terminal) are simply absent rather than
-excluded by name. The price of the allowlist is a second edit: a plugin this repo's *runs* need is
+So `mattpocock-skills` (workflow skills for a person at a terminal) is simply absent rather than
+excluded by name. `playwright` used to be listed beside it, because its MCP server connects and
+then fails on first use against an image with no browsers; the image carries chromium now, so it
+moved instead to `PLAYWRIGHT`, asked for by the one phase that drives a browser. Which is the
+other half of the same argument: a plugin every phase installs is a plugin every phase can be
+broken by, and four of the five need no browser at all. `SandboxNeeds` in `src/sandbox.mts` is
+how a phase asks — plugins, and the application's own environment. The price of the allowlist is a second edit: a plugin this repo's *runs* need is
 enabled in `.claude/settings.json` **and** named in `SANDBOX_PLUGINS`. Two entries that change
 rarely is a cheap place to pay it, and forgetting the second half is visible in the log as a run
 whose plugin chain is shorter than you expected.

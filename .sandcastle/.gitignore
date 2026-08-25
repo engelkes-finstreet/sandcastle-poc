@@ -4,6 +4,7 @@ logs/
 worktrees/
 state/
 watchtower/
+shots/
 
 # The two templates are the tracked half of the pair, and the root .gitignore's
 # `.env*` would otherwise swallow .env.example. This file is deeper, so it wins.

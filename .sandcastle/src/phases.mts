@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { join, sep } from "node:path";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { basename, join, sep } from "node:path";
 import { Output, claudeCode, run } from "@ai-hero/sandcastle";
 import {
   BASE_BRANCH,
@@ -12,6 +12,8 @@ import {
   LABEL,
   LOGS,
   MAX_REVISION_ROUNDS,
+  MAX_SHOTS,
+  MAX_SHOT_BYTES,
   MODEL,
   PLAN_PROMPT,
   PLAN_TAG,
@@ -19,13 +21,22 @@ import {
   REPO_ROOT,
   REVIEW_MODEL,
   VERDICTS,
+  WALKTHROUGH_MODEL,
+  WALKTHROUGH_PROMPT,
   WORKTREES,
   branchFor,
   logFileFor,
   logRefFor,
+  shotsHostDir,
 } from "./config.mts";
 import { markReadyForReview, syncBranchFromOrigin } from "./forge.mts";
-import { sandbox, startupCommands } from "./sandbox.mts";
+import {
+  PLAYWRIGHT,
+  SHOTS_SANDBOX_DIR,
+  type SandboxNeeds,
+  sandbox,
+  startupCommands,
+} from "./sandbox.mts";
 import { describe, git, log } from "./shell.mts";
 import { controller } from "./shutdown.mts";
 import { issuePromptArgs, tracker } from "./tracker.mts";
@@ -37,8 +48,10 @@ import type {
   Issue,
   Outcome,
   Planned,
+  Shot,
   Tracked,
   Verdict,
+  Walkthrough,
 } from "./types.mts";
 
 // The agent runs, and everything about how a container is configured. Each phase is
@@ -233,11 +246,14 @@ const clearLeftoverWorktrees = () => {
 };
 
 /**
- * Shared by all four phases; the prompt, the output and the model are what differ.
- * The model is a parameter because the reviewer runs on a cheaper one than the
- * agent it reviews — see REVIEW_MODEL.
+ * Shared by every phase; the prompt, the output, the model and what the container
+ * needs are what differ. The model is a parameter because the reviewer and the
+ * walkthrough run on a cheaper one than the agent they read — see REVIEW_MODEL. The
+ * needs are a parameter because one phase drives a browser against a real login and
+ * the rest are text against a diff, and a container built for the second has no
+ * business holding what the first is trusted with — see SandboxNeeds.
  */
-const runOptions = (branch: string, model: string = MODEL) => {
+const runOptions = (branch: string, model: string = MODEL, needs: SandboxNeeds = {}) => {
   mkdirSync(LOGS, { recursive: true });
   clearLeftoverWorktrees();
 
@@ -246,7 +262,7 @@ const runOptions = (branch: string, model: string = MODEL) => {
 
   return {
     cwd: REPO_ROOT,
-    sandbox: sandbox(),
+    sandbox: sandbox(needs),
     agent: claudeCode(model, { effort: "high" as const }),
 
     // One log file per branch, named rather than auto-generated: all four phases
@@ -267,7 +283,7 @@ const runOptions = (branch: string, model: string = MODEL) => {
     // gives the reviewer the implementation's commits to read.
     branchStrategy: { type: "branch" as const, branch, baseBranch: BASE_BRANCH },
 
-    hooks: { sandbox: { onSandboxReady: startupCommands } },
+    hooks: { sandbox: { onSandboxReady: startupCommands(needs) } },
 
     idleTimeoutSeconds: IDLE_TIMEOUT_SECONDS,
 
@@ -637,6 +653,159 @@ export const followUp = async (
  * caller, which commits the worktree before building this: see the catch in
  * workflow.mts, and commitWorktree above for why that is possible at all.
  */
+// ----------------------------------------------------- phase 6: walkthrough
+
+/**
+ * The agent's account of the walk, and the per-shot lines inside it.
+ *
+ * Parsed by hand and forgivingly, for the reason every tag in this file is parsed
+ * that way and one more: the walkthrough runs after the push, so a malformed tag has
+ * to cost a caption rather than a pull request — and the pictures do not come from
+ * here at all. They come off the filesystem. Everything this parses is words about
+ * images that already exist, which is why none of it can fail hard.
+ */
+const WALKTHROUGH_BODY = /<walkthrough>([\s\S]*?)<\/walkthrough>/;
+const SHOT_LINE = /<shot\s+([^>]*?)>([\s\S]*?)<\/shot>/g;
+
+const attribute = (raw: string, name: string) =>
+  new RegExp(`\\b${name}\\s*=\\s*"([^"]*)"`).exec(raw)?.[1]?.trim() || undefined;
+
+/**
+ * What the agent said about each file it saved, keyed by filename.
+ *
+ * Allowed to be wrong in both directions, because the images are the record and this
+ * is only commentary: a caption naming a file that does not exist is dropped by the
+ * lookup, and a file nobody captioned still reaches the pull request under its own
+ * name. `basename` because an agent asked for a filename will sometimes give a path.
+ */
+const captionsFrom = (stdout: string) => {
+  const captions = new Map<string, Omit<Shot, "file" | "path">>();
+  for (const [, raw, text] of stdout.matchAll(SHOT_LINE)) {
+    const file = attribute(raw, "file");
+    if (!file) continue;
+    captions.set(basename(file), {
+      caption: text.trim() || undefined,
+      url: attribute(raw, "url"),
+      status: attribute(raw, "status"),
+    });
+  }
+  return captions;
+};
+
+/**
+ * Log into the running application, walk to the pages this pull request touched, and
+ * photograph them.
+ *
+ * A sibling of phase 4 in every structural way — a fresh session, after the push,
+ * read-only, best-effort, and unable to hold the branch back — and its opposite in
+ * what it produces. The reviewer produces a judgement, which is why it has to be a
+ * stranger to be worth anything. This produces a photograph, and a photograph taken
+ * by the agent that wrote the code is exactly as good as one taken by anybody else.
+ * That is the whole reason this phase does not need to be a stranger the way phase 4
+ * does: there is no verdict here for a human to over-trust, so the extra context-free
+ * session that buys phase 4 its independence would buy this nothing. Both are switched
+ * off for now — see the banner on the call site in workflow.mts. See
+ * docs/adr/0011-the-walkthrough-is-a-photograph-not-a-verdict.md.
+ *
+ * The one thing it is trusted with is a real staging login, which is also the only
+ * phase-specific privilege any container has — `appEnv` in sandbox.mts.
+ *
+ * Everything after the run is deliberately host-side arithmetic on files: which
+ * screenshots exist, how big they are, how many of them there may be. What the agent
+ * *says* only ever becomes a caption.
+ */
+export const walkPages = async (tracked: Tracked): Promise<Walkthrough | undefined> => {
+  const { issue, branch } = tracked;
+  const hostDir = shotsHostDir(issue.key);
+
+  // Emptied rather than merged. A second walkthrough of the same pull request writes
+  // the same filenames into the same directory, and a shot left over from the last
+  // attempt is indistinguishable on disk from one taken a minute ago — so a page that
+  // has since broken would go on being illustrated by a picture of it working.
+  rmSync(hostDir, { recursive: true, force: true });
+
+  log(`  walking ${tracker.issueRef(issue.key)} on ${branch} with model ${WALKTHROUGH_MODEL}`);
+
+  const result = await run({
+    ...runOptions(branch, WALKTHROUGH_MODEL, {
+      plugins: [PLAYWRIGHT],
+      appEnv: true,
+      shotsHostDir: hostDir,
+    }),
+    name: `issue-${issue.key}-walkthrough`,
+    promptFile: WALKTHROUGH_PROMPT,
+    promptArgs: {
+      // The issue and the plan, for the same reason the reviewer gets them: knowing
+      // what was asked for is how it decides which pages are worth photographing.
+      ...(await issuePromptArgs(issue)),
+      PLAN: tracked.plan,
+      BASE: BASE_BRANCH,
+      SHOTS_DIR: SHOTS_SANDBOX_DIR,
+      MAX_SHOTS: String(MAX_SHOTS),
+    },
+  });
+
+  // Same warning as the reviewer's, same reasoning: the prompt says read-only and
+  // nothing here pushes, so commits made anyway are stranded ahead of what the pull
+  // request shows. Said out loud rather than reset under a worktree that may still exist.
+  const strayCommits = result.commits.length;
+  if (strayCommits > 0) {
+    log(
+      `  WARNING: the walkthrough run committed ${strayCommits} time(s) on ${branch} despite being ` +
+        `told not to. Those commits are local and unpushed — \`git reset --hard origin/${branch}\` clears them.`,
+    );
+  }
+
+  if (!existsSync(hostDir)) {
+    log("  WARNING: the walkthrough left no screenshot directory — nothing to attach");
+    return undefined;
+  }
+
+  const files = readdirSync(hostDir)
+    .filter((file) => file.toLowerCase().endsWith(".png"))
+    .sort();
+
+  // Two bounds, enforced here rather than trusted to the prompt, because both of them
+  // are promises made to a repository rather than to a run: every shot is a binary
+  // blob committed forever, and an agent told to photograph what changed has no
+  // natural stopping point. Neither is silent — `dropped` reaches the pull request, or
+  // a body would read as complete coverage of a change it half photographed.
+  const oversize: string[] = [];
+  const sized = files.filter((file) => {
+    const { size } = statSync(join(hostDir, file));
+    if (size <= MAX_SHOT_BYTES) return true;
+    oversize.push(`${file} (${Math.round(size / 1000)}kB)`);
+    return false;
+  });
+  if (oversize.length > 0) {
+    log(`  dropped ${oversize.length} oversized shot(s), over ${MAX_SHOT_BYTES / 1_000_000}MB: ${oversize.join(", ")}`);
+  }
+
+  const kept = sized.slice(0, MAX_SHOTS);
+  const dropped = files.length - kept.length;
+  if (dropped > oversize.length) {
+    log(`  ${files.length} shots taken and MAX_SHOTS is ${MAX_SHOTS} — keeping the first ${kept.length}`);
+  }
+
+  if (kept.length === 0) {
+    log("  WARNING: the walkthrough saved no usable screenshot — nothing to attach");
+    return undefined;
+  }
+
+  const captions = captionsFrom(result.stdout);
+  const shots: Shot[] = kept.map((file) => ({
+    file,
+    path: join(hostDir, file),
+    ...captions.get(file),
+  }));
+
+  const summary = WALKTHROUGH_BODY.exec(result.stdout)?.[1]?.trim() ?? "";
+  if (!summary) log("  WARNING: the walkthrough left no <walkthrough> block — the shots go up uncommented");
+
+  log(`  ${tracker.issueRef(issue.key)} walked → ${shots.length} shot(s)${dropped > 0 ? `, ${dropped} dropped` : ""}`);
+  return { shots, summary, dropped, strayCommits };
+};
+
 export const hostFailureAttempt = (tracked: Tracked, detail: string, rescued: number): Attempt => ({
   outcome: "no-signal",
   logRef: logRefFor(tracked.branch),

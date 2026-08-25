@@ -1,5 +1,11 @@
 import { LABEL, MAX_REVISION_ROUNDS, PLAN_BLOCKED } from "./config.mts";
-import { commentOnPr, decide, openPlanPullRequest } from "./forge.mts";
+import {
+  attachShots,
+  commentOnPr,
+  decide,
+  openPlanPullRequest,
+  pushShots,
+} from "./forge.mts";
 import {
   announceAbandoned,
   announceApproved,
@@ -15,6 +21,8 @@ import {
   announcePlanningFailed,
   announceRevising,
   announceRoundsSpent,
+  announceWalkthrough,
+  announceWalkthroughSkipped,
   reportUnclear,
 } from "./notify.mts";
 import {
@@ -24,6 +32,7 @@ import {
   implementPlan,
   planIssue,
   reviewCode,
+  walkPages,
 } from "./phases.mts";
 import { describe, log } from "./shell.mts";
 import { controller } from "./shutdown.mts";
@@ -41,6 +50,7 @@ import type {
   Reviewed,
   Serviced,
   Tracked,
+  Walkthrough,
 } from "./types.mts";
 
 // The state machine: what the watcher does with an issue, and with whatever a
@@ -280,6 +290,31 @@ const implement = async (tracked: AwaitingPlan, decision: Reviewed): Promise<Ser
   // await codeReview(shipped, decision.comment);
   // ------------------------------------------------------------------------
 
+  // ---- phase 6, switched off for now -------------------------------------
+  // Parked beside phase 4 and for the same kind of reason, one order lower down: the
+  // thing being established first is that a simplified flow works end to end through
+  // Jira on the new infrastructure. A third container per issue — one that boots the
+  // app, logs into staging and drives a browser — is the largest new moving part in
+  // this factory, and adding it to the run you are still trying to trust makes a
+  // failure in either harder to read.
+  //
+  // Everything it needs is in place and none of it is speculative: `walkthrough`
+  // below, `walkPages` in phases.mts, `prompts/walkthrough.md`, `pushShots` and
+  // `attachShots` in forge.mts, the Slack wording in notify.mts, and chromium in the
+  // Dockerfile. Turning it on is this line plus the matching line in `announceAttempt`
+  // — and, before it can do anything, the browser-driving instructions that
+  // prompts/walkthrough.md leaves as a placeholder in its Step 2.
+  //
+  // Why it is worth turning on at all, and why it does not need to be a stranger to
+  // the code the way phase 4 does, is
+  // docs/adr/0011-the-walkthrough-is-a-photograph-not-a-verdict.md.
+  //
+  // Awaited when on, so the poll waits on it exactly as it would on a review — one
+  // container at a time is what keeps the worktree handling in phases.mts simple.
+  //
+  // await walkthrough(shipped);
+  // ------------------------------------------------------------------------
+
   return "worked";
 };
 
@@ -412,6 +447,57 @@ const revise = async (tracked: AwaitingRevision, request: ChangeRequest): Promis
   if (post.error) log(`  WARNING: Slack notification failed: ${post.error}`);
 
   return "worked";
+};
+
+// ----------------------------------------------------- phase 6: walkthrough
+
+/**
+ * Photograph the running application, and put the pictures in the pull request body.
+ *
+ * Best-effort by exactly the same construction as phase 4, and for exactly the same
+ * reasons: it runs after the push, so no failure inside it — a browser that would not
+ * start, a login that would not take, a container that timed out — can cost the
+ * implementation. Hence no return value, and hence every path out of here saying
+ * something, because a description with no screens looks identical to a walkthrough
+ * nobody ran.
+ *
+ * Three things can fail independently and only the first is fatal to the phase: taking
+ * the shots, pushing them somewhere GitHub can serve them, and getting them into the
+ * body. The last two degrade — `attached` is false, the Slack line says where the files
+ * are on the host instead of claiming they are in the description — because a
+ * screenshot on disk that nobody linked is still worth more than a phase that reports
+ * nothing happened.
+ *
+ * **Currently switched off, and therefore currently uncalled** — see the commented call
+ * in `implement` above for what to uncomment and why it is commented, and note that
+ * `prompts/walkthrough.md` needs its Step 2 written before turning it on buys anything.
+ * Exported like this module's other entry points rather than left local, which is also
+ * what keeps `noUnusedLocals` from failing the typecheck while it is parked.
+ */
+export const walkthrough = async (tracked: Tracked) => {
+  let walked: Walkthrough | undefined;
+
+  try {
+    walked = await walkPages(tracked);
+  } catch (error) {
+    if (controller.signal.aborted) {
+      log(`  cancelled — ${tracker.issueRef(tracked.issue.key)} is pushed and ready, but unphotographed.`);
+      return;
+    }
+    const detail = describe(error);
+    log(`  ${tracker.issueRef(tracked.issue.key)} could not be walked: ${detail}`);
+    await announceWalkthroughSkipped(tracked, `the walkthrough run failed: ${detail}`);
+    return;
+  }
+
+  if (!walked) {
+    await announceWalkthroughSkipped(tracked, "the walkthrough saved no screenshots");
+    return;
+  }
+
+  const links = pushShots(tracked.issue.key, walked.shots, tracker.issueRef(tracked.issue.key));
+  const attached = attachShots(tracked.prNumber, tracked.issue.key, walked, links);
+  await announceWalkthrough(tracked, walked, attached);
 };
 
 // ------------------------------------------------------------- the one turn

@@ -21,8 +21,26 @@ import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 // there for why copy is load-bearing.
 const STORE_DIR = `${homedir()}/.cache/sandcastle-pnpm-store`;
 
+/**
+ * Where a walkthrough writes its screenshots inside the container. Deliberately not
+ * under /home/agent/workspace: the worktree is git's, and anything the agent leaves
+ * there is either swept into a commit by the next run's rescue or deleted with the
+ * worktree when sandcastle finds it clean. A directory of its own, bind-mounted from
+ * the host, is neither — the PNG is on host disk the moment it is saved.
+ *
+ * The host half is `shotsHostDir` in config.mts.
+ */
+export const SHOTS_SANDBOX_DIR = "/home/agent/shots";
+
 const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const HOST_NPMRC = `${REPO_ROOT}.npmrc`;
+
+// The application's own environment: what `next dev` needs to boot and what a login
+// against staging needs to succeed. Both are gitignored, so both are absent from a
+// sandbox worktree for exactly the reason .npmrc is — see appEnv() below for the
+// rule about which phase is allowed to be handed them.
+const HOST_APP_ENV = `${REPO_ROOT}.env`;
+const HOST_E2E_ENV = `${REPO_ROOT}.env.e2e`;
 const CLAUDE_SETTINGS = `${REPO_ROOT}.claude/settings.json`;
 
 // Marketplaces the CLI knows by name but whose source .claude/settings.json does
@@ -47,15 +65,52 @@ const BUILTIN_MARKETPLACE_SOURCES: Record<string, string> = {
 // source is declared) and named here. Two entries that change rarely is a cheap place
 // to pay it.
 //
-// Deliberately absent: `playwright`, whose MCP server connects and then fails on first
-// use because the image has no browsers, and `mattpocock-skills`, whose skills are for a
-// person at a terminal — no prompt under .sandcastle/prompts loads one, and the review
-// prompt carries its own two-axis structure and smell baseline inline precisely so a run
-// does not depend on it.
+// Deliberately absent: `mattpocock-skills`, whose skills are for a person at a terminal
+// — no prompt under .sandcastle/prompts loads one, and the review prompt carries its own
+// two-axis structure and smell baseline inline precisely so a run does not depend on it.
+//
+// `playwright` used to be listed here as absent too, because its MCP server connects and
+// then fails on first use against an image with no browsers. The image has chromium now,
+// so it moved to PLAYWRIGHT below rather than into this list: one phase needs a browser
+// and four do not, and a plugin every phase installs is a plugin every phase can be
+// broken by.
 const SANDBOX_PLUGINS = [
   "finstreet-dev@finstreet-plugins",
   "finstreet-fe@finstreet-plugins",
 ];
+
+/**
+ * The browser, for the one phase that drives one. Asked for per phase rather than
+ * added to the list above — see the note there.
+ *
+ * Its MCP server carries its own playwright, which pins its own chromium revision;
+ * the image pins one too (PLAYWRIGHT_VERSION in the Dockerfile). When those agree the
+ * browser is already on disk and costs nothing. When they drift the server downloads
+ * the revision it wants at first use, which is slow but works — so a skew shows up as
+ * a long first screenshot rather than as a dead phase.
+ */
+export const PLAYWRIGHT = "playwright@claude-plugins-official";
+
+/**
+ * What one phase needs from its container over and above what every phase gets.
+ * Declared once by the phase and handed to both `sandbox` and `startupCommands`, so
+ * the environment a container is built with and the commands run inside it cannot
+ * disagree about what that phase was supposed to have.
+ */
+export type SandboxNeeds = {
+  /** Plugins beyond SANDBOX_PLUGINS. */
+  readonly plugins?: readonly string[];
+  /**
+   * Carry the host's application environment in, so `next dev` boots and a login
+   * reaches a real backend.
+   */
+  readonly appEnv?: boolean;
+  /**
+   * A host directory to expose at SHOTS_SANDBOX_DIR, for a phase that produces files
+   * the host has to read back after the container is gone.
+   */
+  readonly shotsHostDir?: string;
+};
 
 /**
  * The repo's .npmrc is gitignored, and a sandbox worktree is a checkout of
@@ -83,6 +138,44 @@ const npmrc = () => {
 };
 
 /**
+ * The host's application environment, carried in the same way and for the same
+ * reason as .npmrc: the file is gitignored, a sandbox worktree is a checkout of
+ * committed history, and without it `next dev` boots without a backend to talk to.
+ *
+ * **This is the one place a container is handed a credential that is not its own,
+ * and it is deliberate.** AUTH_SECRET, HMAC_SECRET and the two API base URLs are
+ * how the walkthrough reaches a real login; E2E_TEST_* is who it logs in as. They
+ * are staging, throwaway, and rotatable, which is the whole basis on which this is
+ * acceptable — a production value in .env turns every walkthrough container into a
+ * place production credentials have been. Nothing enforces that but this comment.
+ *
+ * It bypasses env.mts's two-file rule rather than breaking it. That rule is about
+ * keys in .sandcastle/.env, which are forwarded to *every* container; this is a file
+ * read at the moment one phase is built, and only the phase that asks for it. The
+ * rule it does keep is the one that matters: no tracker credential, ever — the
+ * walkthrough talks to the application, never to GitHub or Jira.
+ *
+ * Missing files are a warning, never a throw. An absent .env means the walkthrough
+ * will not get a page to photograph and will say so on the pull request, which is a
+ * far better failure than a watcher that will not start.
+ */
+const appEnv = () => {
+  const read = (path: string, what: string) => {
+    if (existsSync(path)) return readFileSync(path, "utf8");
+    console.warn(
+      `  WARNING: no ${path}. The walkthrough phase carries it into the container to ${what}; ` +
+        `without it the phase will report that it could not reach the application.`,
+    );
+    return "";
+  };
+
+  return {
+    SANDCASTLE_APP_ENV: read(HOST_APP_ENV, "boot the dev server against staging"),
+    SANDCASTLE_E2E_ENV: read(HOST_E2E_ENV, "know which test user to log in as"),
+  };
+};
+
+/**
  * Skills and MCP servers reach the agent through plugins, and .claude/settings.json
  * is tracked — so the worktree already says which ones this repo wants. Declaring
  * is not installing, though: a fresh container has no ~/.claude/plugins at all, and
@@ -99,13 +192,11 @@ const npmrc = () => {
  * from settings.json, which is the file that declares them. A plugin this repo has
  * explicitly disabled there is a contradiction rather than a default, so it throws.
  */
-const pluginCommands = () => {
+const pluginCommands = (plugins: readonly string[]) => {
   const settings = JSON.parse(readFileSync(CLAUDE_SETTINGS, "utf8")) as {
     enabledPlugins?: Record<string, boolean>;
     extraKnownMarketplaces?: Record<string, { source?: { repo?: string } }>;
   };
-
-  const plugins = SANDBOX_PLUGINS;
 
   // Absent from enabledPlugins is fine — installing at user scope inside the container
   // enables it there. An explicit `false` is not: it says this repo turned the plugin
@@ -168,13 +259,23 @@ const pluginCommands = () => {
   ].join(" && ");
 };
 
-export const sandbox = () => {
+export const sandbox = (needs: SandboxNeeds = {}) => {
   mkdirSync(STORE_DIR, { recursive: true });
+
+  // Created here rather than left to the container: a bind mount whose host side does
+  // not exist yet is a directory docker makes, owned by root, that the agent then
+  // cannot write a single screenshot into.
+  if (needs.shotsHostDir) mkdirSync(needs.shotsHostDir, { recursive: true });
 
   // Image name defaults to `sandcastle:<repo dir>` — i.e. `sandcastle:sandcastle-poc`,
   // built by `pnpm sandcastle:build-image`.
   return docker({
-    mounts: [{ hostPath: STORE_DIR, sandboxPath: "/home/agent/pnpm-store" }],
+    mounts: [
+      { hostPath: STORE_DIR, sandboxPath: "/home/agent/pnpm-store" },
+      ...(needs.shotsHostDir
+        ? [{ hostPath: needs.shotsHostDir, sandboxPath: SHOTS_SANDBOX_DIR }]
+        : []),
+    ],
     env: {
       SANDCASTLE_NPMRC: npmrc(),
       // claude-plugins-official is a big repo and the CLI gives a marketplace clone
@@ -182,6 +283,10 @@ export const sandbox = () => {
       // because the plugin chain is a startup command that failure kills the run in
       // setup. Nothing here is cached between runs, so every run pays this clone.
       CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS: "600000",
+      // Only for the phase that asked. Every other container is built without these
+      // keys in its environment at all, which is a stronger statement than a phase
+      // that has them and does not read them.
+      ...(needs.appEnv ? appEnv() : {}),
     },
   });
 };
@@ -191,11 +296,12 @@ export const sandbox = () => {
 // `copyToWorktree: ["node_modules"]`: the host tree's native packages are
 // darwin-arm64, so a copied tree dies on the first command. The store mount is
 // what keeps this off the network.
-// These two entries run *concurrently* — sandcastle uses `concurrency: "unbounded"` for
+// The entries run *concurrently* — sandcastle uses `concurrency: "unbounded"` for
 // onSandboxReady hooks. That is fine here, because dependencies (npmrc → install, catalog
-// → plugin install) live inside each entry as an `&&` chain. Anything order-dependent that
-// gets split into two entries will fail intermittently, which is the worst way to fail.
-export const startupCommands = [
+// → plugin install) live inside each entry as an `&&` chain, and the env files below are
+// independent of both. Anything order-dependent that gets split into two entries will fail
+// intermittently, which is the worst way to fail.
+export const startupCommands = (needs: SandboxNeeds = {}) => [
   // The .npmrc must exist before pnpm resolves anything — see the comment on npmrc() above.
   // Writing it into the worktree costs nothing: .npmrc is gitignored, so it cannot end up in
   // a commit the agent makes.
@@ -206,5 +312,17 @@ export const startupCommands = [
   // Independent of the install, so it overlaps with it and costs no extra wall clock. The
   // finstreet-mcp server these plugins carry authenticates with FINSTREET_MCP_TOKEN from
   // .sandcastle/.env — without it the server is configured but never connects.
-  { command: pluginCommands(), timeoutMs: 300_000 },
+  { command: pluginCommands([...SANDBOX_PLUGINS, ...(needs.plugins ?? [])]), timeoutMs: 300_000 },
+  // Same trick as .npmrc, same safety: `.env*` is gitignored, so neither file can end up
+  // in a commit. Only for the phase that asked for it — see appEnv().
+  ...(needs.appEnv
+    ? [
+        {
+          command:
+            `printf '%s\n' "$SANDCASTLE_APP_ENV" > .env && ` +
+            `printf '%s\n' "$SANDCASTLE_E2E_ENV" > .env.e2e`,
+          timeoutMs: 30_000,
+        },
+      ]
+    : []),
 ];

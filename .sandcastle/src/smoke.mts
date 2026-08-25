@@ -34,7 +34,7 @@ const result = await run({
   // to it, which is a common way to get a confusing failure here.
   branchStrategy: { type: "merge-to-head" },
 
-  hooks: { sandbox: { onSandboxReady: startupCommands } },
+  hooks: { sandbox: { onSandboxReady: startupCommands() } },
 
   // Generous enough for the longest command in the checklist. This repo has no test
   // suite, so the gate is typecheck + lint + build, and `pnpm build` is a minute-plus

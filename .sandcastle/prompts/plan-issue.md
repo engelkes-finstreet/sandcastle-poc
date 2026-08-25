@@ -77,7 +77,7 @@ Four sections, in this order, and no others:
    and the only section allowed to be long.
 3. **Verification** — one or two lines. The gate is `pnpm exec tsc --noEmit`, `pnpm lint` and
    `pnpm build`. Name anything you cannot check in this sandbox: the Playwright suite in `e2e/`
-   needs browsers this image does not have, and anything behind a login or a real API is out of
+   needs a login the implementation container is not given, and anything behind a login or a real API is out of
    reach here.
 4. **Open questions** — only decisions that are genuinely a human's to make: which of two
    readings the issue meant, whether some scope is wanted, a preference between two existing
