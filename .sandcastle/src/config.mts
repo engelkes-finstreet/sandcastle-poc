@@ -147,6 +147,22 @@ export const JIRA_TRANSITIONS = join(SANDCASTLE, JIRA_TRANSITIONS_FILE);
 /** The same path as a human would quote it, for the messages that name the file. */
 export const JIRA_TRANSITIONS_REF = `.sandcastle/${JIRA_TRANSITIONS_FILE}`;
 
+/**
+ * The Jira subtask rule: which of a story's subtasks is *this* repository's work,
+ * read only when SANDCASTLE_TRACKER=jira. Committed for the same reason the
+ * transition map is, and one step more so: which discipline a golem implements is
+ * a property of the repository it is pointed at — the frontend golem takes the
+ * `[FE]` subtask and no other — and a repository's own file is the only place
+ * that fact cannot drift away from the code it describes. Absent, or with no
+ * discipline named, every run is scoped to the labelled issue itself, exactly as
+ * it was before this existed. trackers/jira.mts is what reads and validates it.
+ */
+const JIRA_SUBTASKS_FILE = "jira-subtasks.json";
+export const JIRA_SUBTASKS = join(SANDCASTLE, JIRA_SUBTASKS_FILE);
+
+/** The same path as a human would quote it. */
+export const JIRA_SUBTASKS_REF = `.sandcastle/${JIRA_SUBTASKS_FILE}`;
+
 /** The branch an issue is planned and implemented on. */
 export const branchFor = (issueKey: string) => `sandcastle/issue-${issueKey}`;
 

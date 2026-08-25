@@ -5,6 +5,8 @@ import {
   JIRA_BASE_URL,
   JIRA_EMAIL,
   JIRA_PROJECT,
+  JIRA_SUBTASKS,
+  JIRA_SUBTASKS_REF,
   JIRA_TRANSITIONS,
   JIRA_TRANSITIONS_REF,
   LABEL,
@@ -31,6 +33,12 @@ import type { Issue, Tracked } from "../types.mts";
 // On top of the labels sits the transition map: a committed file naming, per
 // moment, a Jira transition to fire. It ships empty, so labels-first is still
 // the behaviour until a team fills it in — see `readTransitionMap` below.
+//
+// Beside it sits the subtask rule, which answers a different question: given a
+// story that is split into a frontend subtask and a backend one, which of them is
+// *this* repository's work. The label goes on the story, the golem takes its own
+// slice of it, and a story whose slice belongs to another repository is left in
+// the queue for that repository's golem — see `readSubtaskRule` and `scopeOf`.
 //
 // Credentials are basic auth against the REST v3 API — JIRA_EMAIL plus a
 // personal API token — read from the host shell and never from
@@ -174,13 +182,39 @@ const adfDoc = (paragraphs: AdfNode[]): AdfNode => ({
 
 // ----------------------------------------------------------------- shapes
 
-type JiraIssue = { key: string; fields?: { summary?: string } };
+/**
+ * A subtask as it arrives inside its parent's `subtasks` field, and as a parent
+ * arrives inside its child's `parent` field: a compact issue — key, summary,
+ * status — rather than a full one. Enough to decide scope, which is why
+ * `queuedIssues` can resolve every story it finds without a second call.
+ */
+type JiraRelated = {
+  key: string;
+  fields?: {
+    summary?: string;
+    status?: { name?: string; statusCategory?: { key?: string } };
+    /** Only ever present on a full issue — a subtask cannot have subtasks. */
+    subtasks?: JiraRelated[];
+  };
+};
+
+type JiraIssue = {
+  key: string;
+  fields?: { summary?: string; subtasks?: JiraRelated[]; parent?: JiraRelated };
+};
 type JiraSearch = { issues?: JiraIssue[] };
 type JiraTransition = { id?: string; name?: string };
 type JiraTransitions = { transitions?: JiraTransition[] };
 type JiraComment = { author?: { displayName?: string }; created?: string; body?: AdfNode };
 type JiraIssueText = {
-  fields?: { description?: AdfNode | null; comment?: { comments?: JiraComment[]; total?: number } };
+  key?: string;
+  fields?: {
+    summary?: string;
+    description?: AdfNode | null;
+    comment?: { comments?: JiraComment[]; total?: number };
+    subtasks?: JiraRelated[];
+    parent?: JiraRelated;
+  };
 };
 
 /** ADF version of the GitHub adapter's oldest-first body-plus-comments flattening. */
@@ -202,6 +236,38 @@ const flattened = (issue: JiraIssueText): string => {
     ),
   ].join("\n\n---\n\n");
 };
+
+// ------------------------------------------------- composing the issue text
+
+/**
+ * The prompts are handed one block of text per issue, so a run whose scope is a
+ * subtask of a story needs both of them in it — and needs the seam between them to
+ * be unmissable. These four compose that block. The headings are `###` because the
+ * prompt already spends `##` on its own sections, and the whole thing lands under
+ * one of them.
+ */
+
+/** The gap between composed sections. */
+const BREAK = "\n\n";
+
+const named = (issue: JiraRelated) => `${issue.key} — ${issue.fields?.summary ?? "(no summary)"}`;
+
+const heading = (title: string, body: string) => `### ${title}\n\n${body || "_No description._"}`;
+
+/**
+ * The subtasks this run must not implement, with their status — the status because
+ * "already done" and "not started" are different things to plan against.
+ */
+const notYours = (subtasks: JiraRelated[]) =>
+  [
+    `Another repository's golem — or a colleague — implements these. Do not implement them here. ` +
+      `Take what they provide as given, and where your work depends on something of theirs that ` +
+      `does not exist yet, say so rather than building it.`,
+    "",
+    ...subtasks.map(
+      (s) => `- ${named(s)}${s.fields?.status?.name ? ` — ${s.fields.status.name}` : ""}`,
+    ),
+  ].join("\n");
 
 // -------------------------------------------------------- the transition map
 
@@ -295,6 +361,213 @@ const readTransitionMap = (): TransitionMap => {
   return map;
 };
 
+// ---------------------------------------------------------- the subtask rule
+
+/**
+ * Which of a story's subtasks this deployment implements. A story in ESCB is
+ * written as one issue with a `[FE]` subtask and a `[BE]` one, and each of them
+ * is a different repository's work — so the golem watching the frontend
+ * repository must take the frontend subtask and leave the other alone, even
+ * though the `Sandcastle` label sits on the story they share.
+ *
+ * The rule is a committed per-repository file, `.sandcastle/jira-subtasks.json`,
+ * for the reason the transition map is one and one reason more: which discipline
+ * a golem implements is a property of the repository it is pointed at, and the
+ * repository's own file is the only place that fact cannot drift away from the
+ * code it describes.
+ */
+type SubtaskRule = {
+  /**
+   * Marks a subtask as this repository's work. Matched anywhere in the subtask's
+   * summary, ignoring case — `[FE]` finds `[CB][FE] - the FE subtask` — because
+   * what a team has is a naming convention, not a field.
+   */
+  readonly mine: string;
+  /**
+   * Marks a subtask as somebody else's. Optional, and it buys one thing: a story
+   * split into disciplines where *mine is absent or already done* is recognised as
+   * another repository's work rather than falling back to the whole story. Without
+   * it, the fallback is "no subtask of mine, so the story itself" — which in a
+   * frontend repository would quietly implement the backend half too.
+   */
+  readonly others: readonly string[];
+};
+
+const RULE_KEYS: Record<keyof SubtaskRule, true> = { mine: true, others: true };
+
+const isRuleKey = (key: string): key is keyof SubtaskRule => Object.hasOwn(RULE_KEYS, key);
+
+const RULE_SHAPE = `  { "mine": "[FE]", "others": ["[BE]"] }`;
+
+/**
+ * Like `unusableMap`: committed configuration a human just edited, so a mistake in
+ * it ends the process naming the file rather than surfacing as a golem that takes
+ * the wrong half of a story.
+ */
+function unusableRule(detail: string): never {
+  console.error(
+    `${JIRA_SUBTASKS_REF} cannot be read as a subtask rule: ${detail}\n\n` +
+      `It says which of a story's subtasks this repository implements:\n${RULE_SHAPE}\n` +
+      `"mine" marks the subtasks to work on, matched anywhere in the summary and ignoring case. ` +
+      `"others" is optional and marks the subtasks that belong to another repository, so a story ` +
+      `holding only those is left alone instead of being implemented whole. An empty "mine" — or ` +
+      `deleting the file — means every run is scoped to the labelled issue itself.`,
+  );
+  process.exit(1);
+}
+
+/**
+ * Read the rule once, at construction, and validate rather than trust it. An
+ * unknown key is almost always a misspelling of one of the two, and a misspelled
+ * key is indistinguishable from a golem that ignores the file.
+ */
+const readSubtaskRule = (): SubtaskRule | undefined => {
+  // Absent means unscoped — the deployment that never opted in, and every
+  // deployment that existed before this did.
+  if (!existsSync(JIRA_SUBTASKS)) return undefined;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(JIRA_SUBTASKS, "utf8"));
+  } catch (error) {
+    unusableRule(describe(error));
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    unusableRule(`it holds ${Array.isArray(parsed) ? "an array" : `a JSON ${typeof parsed}`}, not an object`);
+  }
+
+  const entries = Object.entries(parsed);
+  for (const [key] of entries) {
+    if (!isRuleKey(key)) {
+      unusableRule(`"${key}" is not part of a subtask rule — the two keys are mine, others`);
+    }
+  }
+
+  const { mine, others = [] } = parsed as { mine?: unknown; others?: unknown };
+  if (mine !== undefined && typeof mine !== "string") {
+    unusableRule(`"mine" must be a string, but holds ${JSON.stringify(mine)}`);
+  }
+  if (!Array.isArray(others) || others.some((o) => typeof o !== "string" || !o.trim())) {
+    unusableRule(`"others" must be a list of non-empty strings, but holds ${JSON.stringify(others)}`);
+  }
+
+  const claim = (mine ?? "").trim();
+  // An empty "mine" is the file shipped and not filled in, which is unscoped —
+  // but an empty "mine" *with* an "others" list is a golem that would never claim
+  // anything and skip half the queue for it. That is a mistake, not a default.
+  if (!claim) {
+    if (others.length > 0) {
+      unusableRule(`"others" is set but "mine" is empty, so nothing would ever be claimed`);
+    }
+    return undefined;
+  }
+
+  return { mine: claim, others: (others as string[]).map((o) => o.trim()) };
+};
+
+/**
+ * What one labelled issue's work turns out to be. Three answers, and the third is
+ * the one the rule exists for.
+ */
+type Scope =
+  /**
+   * The labelled issue is the work, whole — no rule configured, or a story that is
+   * not split by discipline at all. This is what every run was before the rule.
+   * `own` is set when the issue's own summary carries this repository's mark: a
+   * `[FE]` subtask labelled directly is *already* the slice, and the log line
+   * should not say it has no `[FE]` subtask of its own.
+   */
+  | { readonly kind: "issue"; readonly own?: true }
+  /**
+   * The work is these subtasks of the labelled issue. Plural because a story may
+   * carry two frontend subtasks, and taking only the first would silently drop the
+   * other: nothing would ever pick the story up again.
+   */
+  | { readonly kind: "subtasks"; readonly work: JiraRelated[]; readonly others: JiraRelated[] }
+  /**
+   * The story is split by discipline and this repository's share is not available —
+   * absent, or already done. The golem leaves it in the queue **with its label on**,
+   * because that label is what the repository whose work it is polls for too.
+   */
+  | { readonly kind: "elsewhere"; readonly why: string };
+
+const marked = (needle: string, summary: string | undefined) =>
+  (summary ?? "").toLowerCase().includes(needle.toLowerCase());
+
+/**
+ * Jira's own notion of finished, rather than a status name: `statusCategory` is
+ * the three-way grouping (`new`, `indeterminate`, `done`) every workflow's
+ * statuses are mapped into, so "is this subtask still open" needs no per-project
+ * configuration of its own.
+ */
+const isDone = (subtask: JiraRelated) => subtask.fields?.status?.statusCategory?.key === "done";
+
+const listed = (subtasks: JiraRelated[]) => subtasks.map((s) => s.key).join(", ");
+
+/** So the log lines read as English whether a story has one of something or three. */
+const plural = (subtasks: JiraRelated[], one: string, many: string) =>
+  subtasks.length === 1 ? one : many;
+
+/**
+ * The rule applied to one labelled issue — its own summary and its subtasks. Pure,
+ * and the only place the three answers are decided: `queuedIssues` uses it to
+ * filter, `moveWorkflow` to pick which issue a transition moves, and the prompt's
+ * scope in `issueText` is the same rule with the done-ness test left out.
+ */
+const scopeOf = (rule: SubtaskRule | undefined, issue: JiraRelated): Scope => {
+  if (!rule) return { kind: "issue" };
+
+  const summary = issue.fields?.summary;
+  const subtasks = issue.fields?.subtasks ?? [];
+
+  // The labelled issue is itself marked as somebody else's — a `[BE]` subtask
+  // labelled directly, most likely. Checked before the subtasks, and `mine` wins a
+  // tie: labelling both halves of a story is the tidiest way to run two golems off
+  // one project, and it only works if each of them recognises the other's.
+  const notMine = marked(rule.mine, summary)
+    ? undefined
+    : rule.others.find((other) => marked(other, summary));
+  if (notMine) {
+    return { kind: "elsewhere", why: `it is itself marked "${notMine}" — another repository's work` };
+  }
+
+  const mine = subtasks.filter((s) => marked(rule.mine, s.fields?.summary));
+  const open = mine.filter((s) => !isDone(s));
+  if (open.length > 0) {
+    const claimed = new Set(open.map((s) => s.key));
+    return { kind: "subtasks", work: open, others: subtasks.filter((s) => !claimed.has(s.key)) };
+  }
+
+  // Mine exists but is finished. Whatever is left on this story is somebody
+  // else's, and re-implementing a done subtask is the one thing that must not
+  // happen — this is also what keeps a shipped story from being picked up twice.
+  if (mine.length > 0) {
+    return {
+      kind: "elsewhere",
+      why:
+        `its "${rule.mine}" ${plural(mine, "subtask", "subtasks")} (${listed(mine)}) ` +
+        `${plural(mine, "is", "are")} already done`,
+    };
+  }
+
+  // No subtask of mine, but the story is split by discipline: it is another
+  // repository's, and its golem is polling the same label.
+  const theirs = subtasks.filter((s) => rule.others.some((other) => marked(other, s.fields?.summary)));
+  if (theirs.length > 0) {
+    return {
+      kind: "elsewhere",
+      why:
+        `it has no "${rule.mine}" subtask, and ${listed(theirs)} ` +
+        `${plural(theirs, "belongs", "belong")} to another repository`,
+    };
+  }
+
+  // Subtasks that mean nothing to the rule — or none at all — leave the issue
+  // itself as the work, which is what a project not using the convention gets,
+  // and what a directly labelled `[FE]` subtask is.
+  return marked(rule.mine, summary) ? { kind: "issue", own: true } : { kind: "issue" };
+};
+
 // ---------------------------------------------------------------- adapter
 
 /**
@@ -329,16 +602,68 @@ export const jiraTracker = (): Tracker => {
   // file and a Jira one never reads it twice.
   const transitions = readTransitionMap();
   const configured = Object.entries(transitions);
+  const rule = readSubtaskRule();
 
   const browseUrl = (key: string) => `${JIRA_BASE_URL}/browse/${key}`;
 
-  const search = async (jql: string): Promise<JiraIssue[]> => {
+  const search = async (jql: string, fields = "summary"): Promise<JiraIssue[]> => {
     const result = (await call(
       "GET",
-      `/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=summary&maxResults=50`,
+      `/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${fields}&maxResults=50`,
     )) as JiraSearch;
     return result.issues ?? [];
   };
+
+  /**
+   * The scope decision, said once per issue rather than once per poll. It is the
+   * answer to "why is that story not being worked on", and the two-minute poll
+   * would bury it — so the line is kept and only reprinted when the answer
+   * changes, which is exactly when it is news.
+   */
+  const spoken = new Map<string, string>();
+
+  const announceScope = (key: string, line: string) => {
+    if (spoken.get(key) === line) return;
+    spoken.set(key, line);
+    log(`  jira: ${line}`);
+  };
+
+  const describeScope = (key: string, scope: Scope) => {
+    if (!rule) return;
+    if (scope.kind === "subtasks") {
+      announceScope(
+        key,
+        `${key} → ${listed(scope.work)} — the "${rule.mine}" work on it` +
+          (scope.others.length ? ` (leaving ${listed(scope.others)})` : ""),
+      );
+    } else if (scope.kind === "elsewhere") {
+      announceScope(key, `${key} left for another repository's golem — ${scope.why}`);
+    } else {
+      announceScope(
+        key,
+        scope.own
+          ? `${key} is "${rule.mine}" work itself — the issue is worked whole`
+          : `${key} has no "${rule.mine}" subtask — the issue is worked whole`,
+      );
+    }
+  };
+
+  /**
+   * One issue's scope, resolved from Jira rather than remembered: the same answer
+   * has to come out after a restart, days into a wait, with nothing on disk but the
+   * key. One call, and none at all when no rule is configured.
+   */
+  const scopeFor = async (key: string): Promise<Scope> => {
+    if (!rule) return { kind: "issue" };
+    const issue = (await call("GET", `/rest/api/3/issue/${key}?fields=summary,subtasks`)) as JiraIssue;
+    const scope = scopeOf(rule, issue);
+    describeScope(key, scope);
+    return scope;
+  };
+
+  /** The issues a moment moves: this repository's subtasks, or the issue itself. */
+  const workKeys = (key: string, scope: Scope) =>
+    scope.kind === "subtasks" ? scope.work.map((s) => s.key) : [key];
 
   /**
    * The transitions the issue is offering *now*. Asked per moment and never
@@ -391,22 +716,37 @@ export const jiraTracker = (): Tracker => {
     const wanted = transitions[moment];
     if (!wanted) return;
 
+    // The board column that should move is the one the golem is actually working:
+    // a story whose frontend subtask this run implements has its *subtask* started
+    // and finished, and stories are what subtasks add up to. Resolved per moment
+    // for the same reason the transition names are — this is a mirror, and the
+    // shape of the story may have changed since the run began.
+    let keys: string[];
     try {
-      const offered = await offeredTransitions(issue.key);
-      // Loosely matched, because the name was typed into a JSON file by a human
-      // reading it off a button.
-      const match = offered.find((t) => t.name?.trim().toLowerCase() === wanted.toLowerCase());
-      if (!match?.id) {
-        log(
-          `  jira: ${issue.key} offers no "${wanted}" transition at ${moment} — skipped ` +
-            `(offered: ${offered.map((t) => t.name).filter(Boolean).join(", ") || "nothing"})`,
-        );
-        return;
-      }
-      await call("POST", `/rest/api/3/issue/${issue.key}/transitions`, { transition: { id: match.id } });
-      log(`  jira: ${issue.key} → "${match.name}" (${moment})`);
+      keys = workKeys(issue.key, await scopeFor(issue.key));
     } catch (error) {
-      log(`  WARNING: could not transition ${issue.key} at ${moment}: ${describe(error)}`);
+      log(`  WARNING: could not read ${issue.key}'s subtasks at ${moment}: ${describe(error)}`);
+      keys = [issue.key];
+    }
+
+    for (const key of keys) {
+      try {
+        const offered = await offeredTransitions(key);
+        // Loosely matched, because the name was typed into a JSON file by a human
+        // reading it off a button.
+        const match = offered.find((t) => t.name?.trim().toLowerCase() === wanted.toLowerCase());
+        if (!match?.id) {
+          log(
+            `  jira: ${key} offers no "${wanted}" transition at ${moment} — skipped ` +
+              `(offered: ${offered.map((t) => t.name).filter(Boolean).join(", ") || "nothing"})`,
+          );
+          continue;
+        }
+        await call("POST", `/rest/api/3/issue/${key}/transitions`, { transition: { id: match.id } });
+        log(`  jira: ${key} → "${match.name}" (${moment})`);
+      } catch (error) {
+        log(`  WARNING: could not transition ${key} at ${moment}: ${describe(error)}`);
+      }
     }
   };
 
@@ -482,6 +822,17 @@ export const jiraTracker = (): Tracker => {
             ? `Jira: transitions — ${configured.map(([moment, name]) => `${moment} → "${name}"`).join(", ")}.`
             : `Jira: no transitions configured in ${JIRA_TRANSITIONS_REF}; the mirror is labels only.`,
         );
+        // And for the same reason: which half of a story this golem will take is
+        // the difference between a queue that looks empty and one that is.
+        log(
+          rule
+            ? `Jira: subtasks — working the "${rule.mine}" subtask of a labelled story` +
+                (rule.others.length
+                  ? `, leaving ${rule.others.map((o) => `"${o}"`).join(" and ")} to another repository`
+                  : ``) +
+                `; a story with neither is worked whole.`
+            : `Jira: no subtask rule in ${JIRA_SUBTASKS_REF}; every run is scoped to the labelled issue itself.`,
+        );
       } catch (error) {
         console.error(
           `The watcher is configured for Jira (SANDCASTLE_TRACKER=jira) but ${JIRA_BASE_URL} ` +
@@ -509,17 +860,106 @@ export const jiraTracker = (): Tracker => {
       refLine: `Refs ${issue.key}`,
     }),
 
-    queuedIssues: async () =>
-      (
-        await search(
-          `project = ${JIRA_PROJECT} AND labels = "${LABEL}" AND statusCategory != Done ORDER BY created ASC`,
-        )
-      ).map((issue) => ({ key: issue.key, title: issue.fields?.summary ?? issue.key })),
+    /**
+     * Everything labelled, minus the stories whose work is another repository's.
+     * The subtasks come back with the search — a compact issue each, key, summary
+     * and status — so the whole queue is resolved in the one call the poll always
+     * made.
+     *
+     * A story that is left out keeps its label, deliberately: the label is the
+     * intake for *every* golem watching this project, and a frontend golem taking
+     * it off a backend story would be dropping work on somebody else's behalf.
+     * Nothing starves for it either — the watcher only ever starts the first issue
+     * of this list, so a story that is not in it cannot hold up the ones that are.
+     */
+    queuedIssues: async () => {
+      const found = await search(
+        `project = ${JIRA_PROJECT} AND labels = "${LABEL}" AND statusCategory != Done ORDER BY created ASC`,
+        "summary,subtasks",
+      );
 
-    issueText: async (key) =>
-      flattened(
-        (await call("GET", `/rest/api/3/issue/${key}?fields=description,comment`)) as JiraIssueText,
-      ),
+      return found
+        .filter((issue) => {
+          const scope = scopeOf(rule, issue);
+          describeScope(issue.key, scope);
+          return scope.kind !== "elsewhere";
+        })
+        .map((issue) => ({ key: issue.key, title: issue.fields?.summary ?? issue.key }));
+    },
+
+    issueText: async (key) => {
+      const issue = (await call(
+        "GET",
+        `/rest/api/3/issue/${key}?fields=summary,description,comment,subtasks,parent`,
+      )) as JiraIssueText;
+      const own = flattened(issue);
+      const parent = issue.fields?.parent;
+
+      // Somebody labelled a subtask directly. Its own body is usually one line —
+      // the story above it holds the requirement — so the story comes along as
+      // context whether or not a rule is configured. Nothing about this is the
+      // rule's doing: a subtask without its story is misleading on any project.
+      if (parent) {
+        const story = (await call(
+          "GET",
+          `/rest/api/3/issue/${parent.key}?fields=summary,description,comment,subtasks`,
+        )) as JiraIssueText;
+        const siblings = (story.fields?.subtasks ?? []).filter((s) => s.key !== key);
+
+        return [
+          `**Scope: ${key}.** It is a subtask of ${parent.key}, whose text follows it below for ` +
+            `context. Plan and implement this subtask only.`,
+          heading(`${key} — ${issue.fields?.summary ?? "(no summary)"}`, own),
+          heading(
+            `For context — the story it belongs to: ${named(parent)}`,
+            flattened(story),
+          ),
+          ...(siblings.length
+            ? [heading(`For context — the story's other subtasks`, notYours(siblings))]
+            : []),
+        ].join(BREAK);
+      }
+
+      // A story split by discipline. The prompt gets the whole story — it is where
+      // the requirement is written — with this repository's subtasks marked as the
+      // scope and the rest marked as not.
+      //
+      // Done-ness is deliberately not consulted here, unlike in the queue: a
+      // subtask closed by hand while its plan sat waiting for approval is still the
+      // slice this run is implementing, and widening the prompt back out to the
+      // whole story because of it would be the worse mistake.
+      const subtasks = issue.fields?.subtasks ?? [];
+      const work = rule ? subtasks.filter((s) => marked(rule.mine, s.fields?.summary)) : [];
+      if (work.length === 0) return own;
+
+      const claimed = new Set(work.map((s) => s.key));
+      const theirs = subtasks.filter((s) => !claimed.has(s.key));
+      log(`  jira: the prompt for ${key} is scoped to ${listed(work)}`);
+
+      // One call per claimed subtask, which is one call in every case anybody has:
+      // the summary alone ("the FE subtask") is never the requirement.
+      const bodies = await Promise.all(
+        work.map(async (s) => {
+          const full = (await call(
+            "GET",
+            `/rest/api/3/issue/${s.key}?fields=description,comment`,
+          )) as JiraIssueText;
+          return heading(`Your scope: ${named(s)}`, flattened(full));
+        }),
+      );
+
+      return [
+        `**Scope: ${listed(work)}.** This story is split into subtasks and ${
+          work.length > 1 ? "those are" : "that one is"
+        } this repository's share of it — plan and implement ${
+          work.length > 1 ? "them" : "it"
+        } and nothing else. The story itself is below for context, and so is what the other subtasks ` +
+          `cover, because the work you do has to fit against them.`,
+        heading(`The story: ${key} — ${issue.fields?.summary ?? "(no summary)"}`, own),
+        ...bodies,
+        ...(theirs.length ? [heading(`Not your scope`, notYours(theirs))] : []),
+      ].join(BREAK);
+    },
 
     signal,
 

@@ -17,6 +17,11 @@ The full text — body and every comment, oldest first — as it stood when this
 started. It is your only copy: this sandbox has no tracker credential, so there is nothing
 more to fetch.
 
+If the text opens with a **Scope:** line, the issue is a story split into subtasks and only the
+subtask(s) named there are this repository's work. The sections marked *for context* — the story
+itself, and what the other subtasks cover — are there so what you do fits against work somebody
+else is doing. They are not yours to do.
+
 {{ISSUE_TEXT}}
 
 ## Where you are
@@ -97,8 +102,9 @@ package that does not do what its documentation says, a file that has to move, a
 pattern you cannot use. That is a decision, not detail. One or two sentences under **Open
 questions**, naming the option you recommend.
 
-Keep the scope as small as the issue allows. A plan that quietly grows the scope is a plan that
-gets rejected.
+Keep the scope as small as the issue allows — and no wider than the **Scope:** line, where there
+is one. A plan that quietly grows the scope is a plan that gets rejected; a plan that reaches into
+another repository's subtask is one nobody can implement from here.
 
 ## Rules
 

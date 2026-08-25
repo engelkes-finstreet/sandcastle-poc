@@ -49,8 +49,11 @@ await tracker.verify();
 
 // 2. The queue, read through the port — byte for byte the call the poll loop
 //    makes: `project = … AND labels = "Sandcastle" AND statusCategory != Done`,
-//    oldest first. This is the answer to "would the watcher find anything?", and
-//    an empty queue is a real answer, not a failure.
+//    oldest first, then the subtask rule applied to what comes back. This is the
+//    answer to "would the watcher find anything?", and an empty queue is a real
+//    answer, not a failure. The rule's decision for every labelled story — which
+//    subtask it would work, or why it is leaving the story to another
+//    repository's golem — is printed by the adapter as it decides, above.
 const queued = await tracker.queuedIssues().catch((error) =>
   fail(
     `The queue read failed, though the credentials were accepted.`,
@@ -61,7 +64,7 @@ const queued = await tracker.queuedIssues().catch((error) =>
   ),
 );
 
-log(`  queue: ${queued.length} issue(s) labelled "${LABEL}" and not Done`);
+log(`  queue: ${queued.length} issue(s) labelled "${LABEL}", not Done, and this repository's work`);
 for (const issue of queued) log(`    ${tracker.issueRef(issue.key)} — ${issue.title}`);
 if (!queued.length) log(`    (nothing queued — label an issue "${LABEL}" and it appears here)`);
 

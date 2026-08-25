@@ -35,6 +35,22 @@ fires. Optional entry by entry and absent by default, so the Jira mirror is labe
 team fills it in. Only the Jira adapter has one.
 _Avoid_: workflow config — the workflow is Jira's, and the map only names moves inside it
 
+**Subtask rule**:
+`jira-subtasks.json`: the committed, per-*repository* file saying which of a story's subtasks this
+golem implements — `mine` to work, `others` to leave alone, matched against subtask summaries. A
+sibling of the transition map, answering a different question: the map is about which board column
+a moment moves, this is about which half of a story is ours at all. Only the Jira adapter has one.
+_Avoid_: calling it a filter — it also composes what the prompt is told, not just what is queued
+
+**Scope**:
+What one labelled issue's work turns out to be, once the subtask rule is applied: the issue itself,
+some of its subtasks, or another repository's (in which case this golem leaves the issue alone with
+its label on). It narrows the *prompt* and the workflow transitions, never the issue's identity —
+the branch, the state file, the pull request and the label swap stay on the labelled issue. See
+`0010-a-golem-takes-its-own-slice-of-a-story.md`.
+_Avoid_: using it for how large a plan is allowed to be, which is the prompts' word for something
+else
+
 **Forge**:
 Where the code changes go: branches, the plan pull request, trigger-word comments,
 ready-for-review, merged and closed. Plain GitHub on purpose — not a port, and it gains no
