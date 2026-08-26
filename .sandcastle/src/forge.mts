@@ -1,8 +1,18 @@
-import { ABANDONS, APPROVES, BOT_MARKER, LABEL, PR_BASE, REVISES } from "./config.mts";
+import {
+  ABANDONS,
+  APPROVES,
+  BOT_MARKER,
+  LABEL,
+  MAX_SHOTS,
+  PR_BASE,
+  REVISES,
+  WALKTHROUGH_MODEL,
+  shotsBranchFor,
+} from "./config.mts";
 import { capture, describe, gh, git, log } from "./shell.mts";
 // Type-only, so the tracker → adapter → forge import chain stays acyclic at runtime.
 import type { PlanPrParts } from "./tracker.mts";
-import type { Decision, PlanDraft, Reviewed, Said, Tracked } from "./types.mts";
+import type { Decision, PlanDraft, Reviewed, Said, Shot, Tracked, Walkthrough } from "./types.mts";
 
 // The forge: everything pull-request-shaped. The branch push, the draft pull
 // request that carries the plan, comments on it, ready-for-review, reading what a
@@ -173,6 +183,170 @@ export const markReadyForReview = (prNumber: number) => {
     gh("pr", "ready", String(prNumber));
   } catch (error) {
     log(`  WARNING: could not mark PR #${prNumber} ready for review: ${describe(error)}`);
+  }
+};
+
+// -------------------------------------------------------------- screenshots
+
+/**
+ * Where an issue's screenshots are readable, keyed by filename. Not folded into
+ * `Shot`, which already has a `url` — that one is the route the agent visited inside
+ * the application, and conflating "the page I loaded" with "where the picture of it
+ * lives" is a confusion that would eventually be printed at a human.
+ */
+export type ShotLinks = ReadonlyMap<string, string>;
+
+/**
+ * Put an issue's screenshots on a branch of their own, and answer with the URL each
+ * one is now readable at.
+ *
+ * This exists because of a gap in GitHub rather than a preference: there is no public
+ * API for uploading an image to a pull request — the web UI's drag-and-drop uses a
+ * private endpoint — so the only way a body can show a picture is for the picture to
+ * already be in the repository. Hence a branch; hence, emphatically, not the branch
+ * under review, which is a diff somebody is reading.
+ *
+ * Written with plumbing rather than a checkout, exactly like `emptyPlanCommit` and for
+ * the same reason: this branch is checked out nowhere on the host, and a `git add`
+ * from REPO_ROOT would stage the PNGs onto whatever the host happens to have out.
+ * `hash-object` writes each blob, `mktree` builds one flat tree from stdin, and
+ * `commit-tree` with no parent makes it an orphan — so a second walkthrough
+ * force-pushes a fresh single commit instead of growing a history nobody will read.
+ *
+ * Best-effort like every other write in this file. A push that fails costs the images
+ * in the body, and the caller still says what was photographed and where the files
+ * are on the host.
+ */
+export const pushShots = (
+  issueKey: string,
+  shots: readonly Shot[],
+  commitRef: string,
+): ShotLinks | undefined => {
+  const branch = shotsBranchFor(issueKey);
+  try {
+    // --no-filters: these are binaries, and a stray text filter from .gitattributes
+    // corrupting a PNG would show up as an image that will not render rather than as
+    // an error anybody could trace back to here.
+    const entries = shots.map(
+      (shot) => `100644 blob ${git("hash-object", "-w", "--no-filters", shot.path)}\t${shot.file}`,
+    );
+
+    const tree = capture("git", ["mktree"], `${entries.join("\n")}\n`);
+    const sha = capture("git", [
+      "commit-tree", tree,
+      "-m", `shots(${commitRef}): ${shots.length} screenshot(s) from a walkthrough`,
+    ]);
+
+    git("update-ref", `refs/heads/${branch}`, sha);
+    // Force, and safely so: an orphan commit never fast-forwards onto the last one, and
+    // nothing but the body this run is about to write points at what is being replaced.
+    git("push", "--force", "origin", `${branch}:refs/heads/${branch}`);
+
+    log(`  pushed ${shots.length} screenshot(s) to ${branch}`);
+    return new Map(
+      shots.map((shot) => [
+        shot.file,
+        `https://github.com/${REPO}/raw/${branch}/${encodeURIComponent(shot.file)}`,
+      ]),
+    );
+  } catch (error) {
+    log(`  WARNING: could not push screenshots to ${branch}: ${describe(error)}`);
+    return undefined;
+  }
+};
+
+/**
+ * The block a walkthrough adds to the pull request body, and the markers that let the
+ * next one replace it rather than stack under it.
+ *
+ * In the body rather than in a comment, which is the one way this differs from the
+ * code review. A comment is a thing said at a moment; the body is what the pull
+ * request *is*, and it is what a reviewer opening it tomorrow reads first. A picture
+ * of the change belongs there, next to the plan it was built from.
+ */
+const SHOTS_OPEN = "<!-- sandcastle:shots -->";
+const SHOTS_CLOSE = "<!-- /sandcastle:shots -->";
+// Global, so a duplicate left by a half-failed run is cleared rather than pushed one
+// block further down the description on every walkthrough after it.
+const SHOTS_BLOCK = new RegExp(`\\n*${SHOTS_OPEN}[\\s\\S]*?${SHOTS_CLOSE}`, "g");
+
+/**
+ * Route, status and caption, as reported — any of the three may be missing, and the
+ * arrow only appears between two things that are both there. A status on its own reads
+ * as `404`, not as `→ 404` pointing at nothing.
+ */
+const shotCaption = (shot: Shot) => {
+  const where = shot.url
+    ? [shot.url, shot.status && `→ ${shot.status}`].filter(Boolean).join(" ")
+    : shot.status;
+  const parts = [`\`${shot.file}\``, where, shot.caption].filter(Boolean);
+  return `_${parts.join(" · ")}_`;
+};
+
+const shotsBody = (walkthrough: Walkthrough, links: ShotLinks | undefined, branch: string) =>
+  [
+    SHOTS_OPEN,
+    "",
+    "## Screens",
+    "",
+    "🏰 **Walkthrough.** A fresh agent logged into staging, drove a browser to the pages this",
+    "pull request touches, and photographed them. These are evidence that it renders — not a",
+    "review, and not a claim that it is right. No human has read the code yet.",
+    "",
+    ...walkthrough.shots.flatMap((shot) => {
+      const href = links?.get(shot.file);
+      return [
+        // width, because a 2x viewport screenshot renders a page-wide slab otherwise, and
+        // six of those turn the description into something nobody scrolls to the end of.
+        href
+          ? `<img src="${href}" width="900" alt="${shot.file}">`
+          : `_(\`${shot.file}\` could not be uploaded — it is on the host at \`${shot.path}\`)_`,
+        "",
+        shotCaption(shot),
+        "",
+      ];
+    }),
+    ...(walkthrough.summary ? [walkthrough.summary, ""] : []),
+    "---",
+    "",
+    walkthrough.dropped > 0
+      ? `_${walkthrough.dropped} further screenshot(s) were taken and dropped — over ${MAX_SHOTS} shots, ` +
+        `or too large to commit. What is above is therefore not everything the agent looked at._`
+      : undefined,
+    `_Driven on \`${WALKTHROUGH_MODEL}\` against staging. The images live on \`${branch}\`; deleting_`,
+    "_that branch breaks them here and nothing else._",
+    "",
+    SHOTS_CLOSE,
+  ]
+    .filter((line) => line !== undefined)
+    .join("\n");
+
+/**
+ * Add the walkthrough's screens to the pull request body, replacing whatever a
+ * previous walkthrough left there.
+ *
+ * Read-modify-write against the live body rather than a body this process remembers,
+ * because it is not the only author: a human edits the description, and a run that
+ * rebuilt it from the plan alone would silently delete what they wrote. Only the
+ * marked block is ever touched.
+ */
+export const attachShots = (
+  prNumber: number,
+  issueKey: string,
+  walkthrough: Walkthrough,
+  links: ShotLinks | undefined,
+): boolean => {
+  try {
+    const { body } = JSON.parse(gh("pr", "view", String(prNumber), "--json", "body")) as {
+      body: string;
+    };
+    const kept = body.replace(SHOTS_BLOCK, "").trimEnd();
+    const block = shotsBody(walkthrough, links, shotsBranchFor(issueKey));
+    gh("pr", "edit", String(prNumber), "--body", `${kept}\n\n${block}`);
+    return true;
+  } catch (error) {
+    log(`  WARNING: could not attach screenshots to PR #${prNumber}: ${describe(error)}`);
+    return false;
   }
 };
 

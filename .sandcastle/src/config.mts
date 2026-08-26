@@ -100,6 +100,15 @@ export const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
  */
 export const REVIEW_MODEL = process.env.SANDCASTLE_REVIEW_MODEL ?? "sonnet";
 
+/**
+ * The walkthrough runs on the same cheap model as the review, and for a reason one
+ * step stronger. Its output is a photograph: what it *judges* never reaches the pull
+ * request, only what it *loaded*. Driving a login and a couple of routes is a
+ * mechanical task with an artifact at the end that a human reads for themselves, so
+ * there is nothing here for a bigger model to be better at.
+ */
+export const WALKTHROUGH_MODEL = process.env.SANDCASTLE_WALKTHROUGH_MODEL ?? "sonnet";
+
 // Validated rather than trusted: a non-numeric override reaches setTimeout as
 // NaN, which fires immediately and turns the idle poll into a hot loop against
 // the GitHub API.
@@ -127,6 +136,7 @@ export const PLAN_PROMPT = prompt("plan-issue.md");
 export const IMPLEMENT_PROMPT = prompt("implement-plan.md");
 export const FOLLOW_UP_PROMPT = prompt("follow-up.md");
 export const CODE_REVIEW_PROMPT = prompt("code-review.md");
+export const WALKTHROUGH_PROMPT = prompt("walkthrough.md");
 
 export const WORKTREES = join(SANDCASTLE, "worktrees");
 export const LOGS = join(SANDCASTLE, "logs");
@@ -165,6 +175,51 @@ export const JIRA_SUBTASKS_REF = `.sandcastle/${JIRA_SUBTASKS_FILE}`;
 
 /** The branch an issue is planned and implemented on. */
 export const branchFor = (issueKey: string) => `sandcastle/issue-${issueKey}`;
+
+/**
+ * Where a walkthrough's screenshots land on the host, one directory per issue.
+ *
+ * Outside the worktree on purpose, and this is the load-bearing part. Sandcastle
+ * removes a worktree whose agent left nothing uncommitted, and a screenshot is
+ * gitignored — so shots written *into* the worktree would be deleted by the very
+ * cleanliness the walkthrough prompt demands. Written *here* they are on host disk
+ * the moment the browser saves them, before the container is torn down, which is the
+ * same trick `commitWorktree` relies on and for the same reason.
+ *
+ * It also keeps them out of reach of the next run's rescue, which does `git add -A`
+ * in the worktree: nothing that never entered the tree can ride onto a branch a human
+ * is reviewing. That safety is structural here rather than a line in .gitignore.
+ *
+ * sandbox.mts bind-mounts the per-issue directory into the container — SHOTS_SANDBOX_DIR
+ * there is the other half of this path.
+ */
+export const SHOTS = join(SANDCASTLE, "shots");
+
+export const shotsHostDir = (issueKey: string) => join(SHOTS, `issue-${issueKey}`);
+
+/**
+ * Screenshots one walkthrough may contribute, and how large each may be. Bounds
+ * rather than preferences: every shot is a binary blob committed to this repository
+ * forever, and an agent told "photograph what changed" has no natural stopping
+ * point. Anything past the bound is dropped with a line in the log and a line on the
+ * pull request — never silently, or the body would read as complete coverage of a
+ * change it only half photographed.
+ */
+export const MAX_SHOTS = 6;
+export const MAX_SHOT_BYTES = 2_000_000;
+
+/**
+ * The branch an issue's screenshots live on, and the only way to get an image into a
+ * pull request body: GitHub has no public API for uploading one, so the picture has
+ * to already be in the repository for markdown to point at it.
+ *
+ * A branch of its own per issue, beside `branchFor`'s and force-pushed on a re-run.
+ * Not the issue branch, which is the diff a human is reading and has no business
+ * carrying half a megabyte of PNG; not one shared branch, which would need a merge
+ * per issue to append to. Deleting it breaks the images in that one pull request
+ * body and nothing else.
+ */
+export const shotsBranchFor = (issueKey: string) => `sandcastle/shots/issue-${issueKey}`;
 
 /** Log file for a branch's runs — all four phases of an issue append to one file. */
 export const logFileFor = (branch: string) => join(LOGS, `${branch.replaceAll("/", "-")}.log`);

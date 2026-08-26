@@ -102,15 +102,45 @@ The run that builds an approved plan, in a session that carries nothing from pha
 `0004-the-implementation-run-starts-fresh.md`.
 
 **Code review** (phase 4):
-The *agent* reviewer: a stranger to the code, reads the diff, posts a comment, fixes nothing.
-Currently switched off.
+The *agent* reviewer: a stranger to the code, reads the diff along both axes, posts a comment,
+fixes nothing. Currently switched off.
 _Avoid_: review, PR review — both read as a human's review, and this one is an agent's
+
+**Axis**:
+One of the two questions the code review asks of a diff — Standards, does it follow how this repo
+writes code; Spec, does it do what the issue asked and only that. Each is a subagent of its own and
+a section of its own, findings never move between them, and the verdict is the only place they
+meet. Standards fans out further (a baseline agent plus up to three heavy skills); Spec never does.
+_Avoid_: pass — what the prompt called them when one agent read the diff twice; dimension, lens
 
 **Follow-up run** (phase 5):
 The run that acts on a human's change request against a diff that has already shipped.
 _Avoid_: revision run — the noun is spent by `0003-there-is-no-revision-run.md`, which is about
 plans; fix loop — the thing `0002-the-code-review-is-a-stranger-and-a-comment.md` rejected, a
 reviewer acting on its own findings
+
+**Walkthrough** (phase 6):
+The run that logs into staging, drives a browser to the pages a shipped diff touches and
+photographs them. A sibling of the code review — fresh session, after the push, read-only,
+best-effort, unable to hold the branch back — and its opposite in what it hands over: pictures
+instead of a judgement, which is why it does not have to be a stranger to the code to be worth
+anything. Currently switched off, alongside phase 4, and its prompt's browser-driving step is
+still unwritten. See `0011-the-walkthrough-is-a-photograph-not-a-verdict.md`.
+_Avoid_: smoke test — that is `smoke.mts`, the sandbox's own health check, and the two would be
+confused constantly; visual review, screenshot review — there is no review here, and a name that
+implies one invites somebody to merge on it
+
+**Shot**:
+One screenshot a walkthrough saved. Found on disk by the host, never taken on the agent's word:
+an image the agent mentioned and did not save does not exist, and one it saved and did not mention
+still reaches the pull request under its own filename.
+_Avoid_: screenshot in code — the shorter word is what `Shot`, `MAX_SHOTS` and `shotsBranchFor`
+already say; evidence — true, and too pleased with itself to write twenty times
+
+**Caption**:
+The agent's words under a shot: the route it says it loaded, the status it says it got, one line
+about what is in the picture. Optional by construction, and quoted rather than trusted — the
+picture is the record and this is commentary on it.
 
 ### The watcher and its memory
 

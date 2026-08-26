@@ -91,6 +91,47 @@ export type CodeReview = {
   readonly strayCommits: number;
 };
 
+/**
+ * One screenshot the walkthrough took, as the host found it on disk. `file` is the
+ * name the agent chose and the only thing that reaches a URL; `path` is where it is
+ * on this host, so a body can still name it when the push fails.
+ *
+ * The caption is optional because it comes from the agent's prose and the image
+ * comes from the filesystem. Those two can disagree — a shot the agent forgot to
+ * mention still exists — and when they do, the file wins and the caption is missing.
+ * A picture with no words under it is worth more than words about a picture nobody
+ * can see.
+ */
+export type Shot = {
+  readonly file: string;
+  readonly path: string;
+  readonly caption?: string;
+  /** The route the agent says it loaded, and what the page answered. Both as reported. */
+  readonly url?: string;
+  readonly status?: string;
+};
+
+/**
+ * Phase 6's result: pictures of the running application, and the agent's own account
+ * of getting to them.
+ *
+ * Optional everywhere it is used, exactly like CodeReview and for the same reason —
+ * the code is pushed by the time the walkthrough runs, so a browser that would not
+ * start costs a comment and never the implementation.
+ *
+ * `summary` is prose and is quoted, not trusted: it is the agent describing its own
+ * work. `shots` came off the filesystem. That asymmetry is the whole point of this
+ * phase — see docs/adr/0011-the-walkthrough-is-a-photograph-not-a-verdict.md.
+ */
+export type Walkthrough = {
+  readonly shots: readonly Shot[];
+  readonly summary: string;
+  /** Shots found on disk but dropped for exceeding MAX_SHOTS or MAX_SHOT_BYTES. */
+  readonly dropped: number;
+  /** Commits the walkthrough made despite being told not to — local only, never pushed. */
+  readonly strayCommits: number;
+};
+
 export type Attempt = {
   readonly outcome: Outcome;
   /** Posted back onto the pull request. */

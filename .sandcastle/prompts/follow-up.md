@@ -77,7 +77,7 @@ else is doing. They are not yours to do.
    - `pnpm build` — must reach Next's route table.
 
    All three must pass before you commit. Quote any failure you cannot legitimately fix rather than
-   working around it. `e2e/` is out of scope: it needs browsers this image does not have.
+   working around it. `e2e/` is out of scope: it needs a login this container is not given.
 5. **Commit** in the repo's conventional-commit style, referencing the issue in the body as
    `Refs {{ISSUE_REF}}`. Write the subject for someone reading the pull request's commit list
    after having already reviewed it once — say what changed now, not what the feature is.
@@ -121,7 +121,8 @@ a single `<testing>` tag:
 The host posts that verbatim as a pull request comment. Write it for the person who asked for the
 change and has already seen the rest. Cover the exact URL and click path to reach the thing you
 touched, what should now be different, and anything you could not check — no real API calls, no
-browser, no e2e suite in here. If the request was ambiguous and you picked a reading, say which.
+running application, no e2e suite in here. If the request was ambiguous and you picked a reading,
+say which.
 
 No preamble, no restating the request.
 

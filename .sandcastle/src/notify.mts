@@ -22,6 +22,7 @@ import type {
   Reviewed,
   Tracked,
   Verdict,
+  Walkthrough,
 } from "./types.mts";
 import { about, endingOf, nextGeneration, outcomeOf, report } from "./watchtower.mts";
 
@@ -340,9 +341,14 @@ export const announceAttempt = (tracked: Tracked, attempt: Attempt, posted: stri
         ? lines(
             `🏰 *Done — ready for your review* · ${prLink(tracked)}`,
             `Implements ${issueLink(tracked.issue)} with ${attempt.commits} commit(s), the gate green inside the sandbox.`,
-            // Phase 4 is switched off in workflow.mts, so this must not promise a
-            // review nobody is running. With it on, prefix the line below with:
-            //   "A code review is running now and lands in this thread. "
+            // What this promises has to match what workflow.mts actually calls, and both
+            // phases that would add to it are switched off there — so this promises
+            // neither. A thread that announces a review or a screenshot nobody is
+            // running is how somebody comes to merge on the strength of one that never
+            // happened. Prefix this line when you turn one on:
+            //   phase 4 → "A code review is running now and lands in this thread. "
+            //   phase 6 → "A walkthrough is photographing it now, and the screens land
+            //              in the pull request description. "
             "Comment `revise` on the pull request for a change; merge or close it when you are done. " +
               "Other issues keep moving in the meantime.",
             links(
@@ -599,4 +605,74 @@ export const announceFinished = (tracked: Tracked, state: string) =>
       ...about(tracked.issue, tracked.threadTs),
       payload: { changeRequest: changeRequestOf(tracked), state: endingOf(state) },
     }),
+  );
+
+// ----------------------------------------------------- phase 6: walkthrough
+
+// **The one moment in this file that speaks to Slack and not to Watchtower**, and it
+// is a gap rather than a decision. Every other announce* here sends its event beside
+// its message through `tell`, precisely so the conversation and the record cannot
+// drift — see the note at the top of this file. This one cannot: the event catalog is
+// `@finstreet/watchtower-golem/events`, it is a closed union, and it has no
+// `walkthrough.*` in it. Asserting past the type to reuse a neighbouring event would
+// be worse than the silence, because the api validates server-side and a screenshot
+// filed as a code review is a lie a dashboard would repeat.
+//
+// Closing it is two schemas in that package — `walkthrough.finished` (shots, dropped,
+// model, whether the body carries them) and `walkthrough.skipped` (why) — and then two
+// `tell` calls here. Until then Watchtower's timeline for an issue jumps from the
+// implementation to the merge with no sign this ran, which is worth knowing when
+// reading one.
+
+/**
+ * Pictures exist, and where they are. Deliberately not `notifyAsk`: a walkthrough
+ * finishing does not hand anybody a turn — the pull request was already theirs to
+ * read, and this only added something to look at while they do.
+ *
+ * `attached` is load-bearing in the wording, not decoration. The shots can exist on
+ * the host and still have failed to reach the body — a push that 403'd, a `pr edit`
+ * that lost a race — and a line claiming "they are in the description" over an empty
+ * description is exactly the kind of small lie that stops people trusting the rest.
+ */
+export const announceWalkthrough = (
+  tracked: Tracked,
+  walkthrough: Walkthrough,
+  attached: boolean,
+) => {
+  const count = walkthrough.shots.length;
+  return notifySlack(
+    lines(
+      `:camera_with_flash: *Walkthrough: ${count} screen${count === 1 ? "" : "s"}* · ${prLink(tracked)}`,
+      attached
+        ? `An agent logged into staging, walked to the pages ${issueLink(tracked.issue)} touches and photographed them. They are in the pull request description — pictures of it running, not a verdict on it.`
+        : `An agent photographed ${count} screen${count === 1 ? "" : "s"} of ${issueLink(tracked.issue)}, but they could not be attached to the pull request. They are on the host: \`${walkthrough.shots[0]?.path}\` and beside it.`,
+      walkthrough.dropped > 0
+        ? `:scissors: ${walkthrough.dropped} further shot(s) were dropped as too many or too large, so the description is not everything it looked at.`
+        : undefined,
+      walkthrough.strayCommits > 0
+        ? `:warning: It also left ${walkthrough.strayCommits} commit(s) on \`${tracked.branch}\` despite being read-only. They are local and unpushed; \`git reset --hard origin/${tracked.branch}\` clears them.`
+        : undefined,
+      links(
+        maybeLink(tracked.prUrl, "The screens"),
+        maybeLink(`${tracked.prUrl}/files`, "Files changed"),
+        logHint(tracked.branch),
+      ),
+    ),
+    tracked.threadTs,
+  );
+};
+
+/**
+ * Nothing was photographed. Said out loud for the same reason a skipped review is:
+ * a pull request description with no screens is indistinguishable from one nobody
+ * tried to take screens of, and the second is the one worth knowing about.
+ */
+export const announceWalkthroughSkipped = (tracked: Tracked, why: string) =>
+  notifySlack(
+    lines(
+      `:grey_question: *No walkthrough* on ${prLink(tracked)} — ${escapeSlack(why)}`,
+      `The implementation is pushed and ready either way; there is just no picture of it running, so the gate is still the only thing that has touched this code.`,
+      links(maybeLink(`${tracked.prUrl}/files`, "Files changed"), logHint(tracked.branch)),
+    ),
+    tracked.threadTs,
   );

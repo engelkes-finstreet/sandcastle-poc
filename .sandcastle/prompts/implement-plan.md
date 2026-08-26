@@ -80,7 +80,8 @@ else is doing. They are not yours to do.
    - `pnpm build` — must reach Next's route table.
 
    All three must pass before you commit. Quote any failure you cannot legitimately fix rather
-   than working around it. `e2e/` is out of scope: it needs browsers this image does not have.
+   than working around it. `e2e/` is out of scope: the image has chromium, but only the
+   walkthrough phase is handed the application's environment, so nothing here can reach a login.
 5. **Commit.** One commit, or a few well-scoped ones, in the repo's conventional-commit style
    (`feat(scope): …`, `fix(scope): …`), referencing the issue in the body as
    `Refs {{ISSUE_REF}}`.
@@ -117,7 +118,8 @@ is the fastest way to lose a reviewer's trust in the rest of it.
 ## Tell the reviewer how to try it
 
 The gate proves the code compiles, lints and builds. It proves nothing about whether the
-feature *works* — nobody has clicked it, and this container has no browser to click it with. So
+feature *works* — nobody has clicked it, and this container has nothing to click: no staging
+credentials reach it, so there is no running application it could log into. So
 hand that over deliberately: end with instructions for running your change on a Mac, inside a
 single `<testing>` tag.
 
@@ -140,7 +142,7 @@ Cover, in whatever order serves the change:
   case you could not exercise, a loading or error state, a validation rule, a value that
   depends on backend data this repo mocks. If you had to guess at intent, this is where you
   say so.
-- **What you could not check.** Be specific and honest — the e2e suite (no browsers here), any
+- **What you could not check.** Be specific and honest — the e2e suite (no login from here), any
   real API call, anything needing data or credentials the sandbox does not have, anything
   behind a flag. A reviewer who knows where the holes are can cover them in two minutes; one
   who assumes it was all verified will ship the hole.
