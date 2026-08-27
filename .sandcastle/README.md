@@ -80,6 +80,7 @@ Branches are named `golem/issue-<n>` and cut from `origin/main`. Pull requests c
 .sandcastle/
 ├── prompts/      what the agent is told, one file per phase
 ├── Dockerfile    the image every run starts from
+├── factory.config.mjs      the gate, the plugin allowlist, the sandbox keys, the models
 ├── .env          the sandbox's secrets — forwarded into the container, gitignored
 ├── host.env      the watcher's own config — never forwarded, gitignored
 ├── jira-transitions.json    moment → Jira transition, one flow per issue type
@@ -88,7 +89,7 @@ Branches are named `golem/issue-<n>` and cut from `origin/main`. Pull requests c
 ```
 
 What lives here is **prose the agent reads** (`prompts/`) and **this golem's own
-configuration** (the two env files and the two Jira files). If you are changing what the agent
+configuration** (`factory.config.mjs`, the two env files and the two Jira files). If you are changing what the agent
 *does*, you are in `prompts/`; if you are changing what happens *around* it, you are in the
 Engine — which no golem edits, so that is a pull request against Watchtower.
 
@@ -110,7 +111,7 @@ Engine — which no golem edits, so that is a pull request against Watchtower.
 | `types.ts` | the shapes that travel between the modules, `Tracked` above all |
 | `shell.ts` | `git`, `gh`, and the timestamped log line |
 | `shutdown.ts` | Ctrl-C, and the sleep that returns early for it |
-| `sandbox.ts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test |
+| `sandbox.ts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test. Takes its allowlist from `factory.config.mjs` |
 | `slack.ts` | the transport: `chat.postMessage` over a bot token |
 | `watchtower.ts` | the other transport: the dashboard's event emitter, the identifiers, and the heartbeat |
 | `smoke.ts` | the health check — `pnpm golem:smoke` |
@@ -310,27 +311,38 @@ before blaming the agent for anything.
 
 ## Configuration
 
-Environment variables, all optional:
+Environment variables. All optional except the two Jira values, which are required when the
+tracker is `jira` — see the note under the table:
 
 | | Default | |
 |---|---|---|
 | `GOLEM_BASE` | `origin/main` | what branches are cut from, and what PRs target |
 | `GOLEM_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state: `github` or `jira`. Anything else refuses to start |
 | `GOLEM_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
-| `JIRA_BASE_URL` | `https://finstreet-team.atlassian.net` | the Jira Cloud site, when the tracker is `jira` |
-| `JIRA_PROJECT` | `ESCB` | the Jira project whose issues feed the factory |
+| `JIRA_BASE_URL` | **none** | the Jira Cloud site. **Required** when the tracker is `jira` |
+| `JIRA_PROJECT` | **none** | the Jira project whose issues feed the factory. **Required** when the tracker is `jira` |
 | `JIRA_EMAIL`, `JIRA_API_TOKEN` | — | Jira credentials, **`host.env` or the shell — never `.sandcastle/.env`**. See below |
 | `GOLEM_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
-| `GOLEM_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
-| `GOLEM_WALKTHROUGH_MODEL` | `sonnet` | the model phase 6 drives the browser on, when phase 6 is on |
+| `GOLEM_REVIEW_MODEL` | `factory.config.mjs` | the model phase 4 reviews on, when phase 4 is on |
+| `GOLEM_WALKTHROUGH_MODEL` | `factory.config.mjs` | the model phase 6 drives the browser on, when phase 6 is on |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `host.env` |
 | `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `host.env` |
 
 Every one of these can be set in `.sandcastle/host.env` instead, which is the usual place; the
 shell overrides it for a single run.
 
-Two pieces of configuration are deliberately *not* environment variables, and both are
-committed, reviewable files under `.sandcastle/`. `jira-transitions.json` maps lifecycle moments
+**`JIRA_BASE_URL` and `JIRA_PROJECT` used to default** to this team's site and this team's
+project key. They do not any more, and the watcher refuses to start without them when the
+tracker is `jira`. The Engine is a pinned dependency several repositories share, and a default
+that is one team's board is a trap rather than a convenience: a golem missing a line in
+`host.env` would start cleanly and poll somebody else's project, which looks like an empty
+queue rather than like a missing line.
+
+Three pieces of configuration are deliberately *not* environment variables, and all three are
+committed, reviewable files under `.sandcastle/`. `factory.config.mjs` holds the gate, the
+plugin allowlist, the keys that only mean something inside the container, and the two cheap
+phases' models — the watcher refuses to start without it, and a malformed one is a startup
+error naming the file and every problem in it at once. `jira-transitions.json` maps lifecycle moments
 to Jira workflow transitions, one flow per issue type; `jira-subtasks.json` says which subtask of
 a story this repository implements. Which transitions a project's workflow offers is a property of
 the project, and which discipline a golem writes is a property of the repository it is pointed at —
@@ -1133,9 +1145,11 @@ file — fetch each marketplace's catalog, then `claude plugin install … -s us
 user scope keeps the container's own `enabledPlugins` out of the tracked settings the agent
 might commit.
 
-**What a run installs is an allowlist, not everything you have enabled.** `SANDBOX_PLUGINS` in
-`sandbox.ts` names it in full — `finstreet-dev` and `finstreet-fe` — and settings.json is
-consulted only for where those marketplaces live. The two directions fail differently, which is
+**What a run installs is an allowlist, not everything you have enabled.** `plugins` in
+`factory.config.mjs` names it in full — `finstreet-dev` and `finstreet-fe` — and settings.json
+is consulted only for where those marketplaces live. It lives in this repository rather than in
+the Engine because which plugins carry a repository's conventions is the repository's own
+answer; `sandbox.ts` reads it and has no list of its own. The two directions fail differently, which is
 the whole argument: a plugin the sandbox wants and does not get is an agent quietly ignoring this
 repo's conventions, while a plugin it gets and does not want can take the run down in setup,
 before the agent starts. The second is not hypothetical. Enabling one personal plugin from
@@ -1151,11 +1165,11 @@ moved instead to `PLAYWRIGHT`, asked for by the one phase that drives a browser.
 other half of the same argument: a plugin every phase installs is a plugin every phase can be
 broken by, and four of the five need no browser at all. `SandboxNeeds` in `sandbox.ts` is
 how a phase asks — plugins, and the application's own environment. The price of the allowlist is a second edit: a plugin this repo's *runs* need is
-enabled in `.claude/settings.json` **and** named in `SANDBOX_PLUGINS`. Two entries that change
+enabled in `.claude/settings.json` **and** named in `plugins`. Two entries that change
 rarely is a cheap place to pay it, and forgetting the second half is visible in the log as a run
 whose plugin chain is shorter than you expected.
 
-A plugin named in `SANDBOX_PLUGINS` and explicitly `false` in settings.json is a contradiction,
+A plugin named in `plugins` and explicitly `false` in settings.json is a contradiction,
 not a default, so it throws at startup rather than resolving itself silently. The SSH and clone
 timeout wiring (`url."https://github.com/".insteadOf`, `CLAUDE_CODE_PLUGIN_GIT_TIMEOUT_MS`) stays
 as insurance: no allowlisted plugin comes from the marketplace that failed that way, but the first
