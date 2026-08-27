@@ -4,7 +4,13 @@ An autonomous coding agent for this repo, running in a Docker container.
 [Sandcastle](https://github.com/mattpocock/sandcastle) provides the sandbox; everything in
 this directory is the wiring around it.
 
-`src/main.mts` is the watcher: a long-running host process that turns
+**The watcher's code is not in this directory.** It is the **Engine** —
+`@finstreet/sandcastle-engine`, a pinned devDependency published from
+[`watchtower/packages/sandcastle-engine`](https://github.com/finstreet/watchtower/tree/main/packages/sandcastle-engine),
+which is also where its ADRs live. Every `*.ts` file named below is a module of that package.
+What is left here is the prompts, the Dockerfile and this golem's own configuration.
+
+`main.ts` is the watcher: a long-running host process that turns
 `Sandcastle`-labelled GitHub issues into pull requests, stops for review at two points, and
 acts on what you say at both. It runs **one agent at a time but tracks as many issues as it
 has state for**, so nothing waits on you. It never merges.
@@ -71,9 +77,7 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 
 ```
 .sandcastle/
-├── src/          the watcher: TypeScript the host runs
 ├── prompts/      what the agent is told, one file per phase
-├── docs/adr/     why it behaves the way it does
 ├── Dockerfile    the image every run starts from
 ├── .env          the sandbox's secrets — forwarded into the container, gitignored
 ├── host.env      the watcher's own config — never forwarded, gitignored
@@ -82,33 +86,34 @@ Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull reque
 └── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
 ```
 
-Two things live in `.sandcastle` and only two: **code that runs on your machine** (`src/`) and
-**prose the agent reads** (`prompts/`). If you are changing what the agent *does*, you are in
-`prompts/`; if you are changing what happens *around* it, you are in `src/`.
+What lives here is **prose the agent reads** (`prompts/`) and **this golem's own
+configuration** (the two env files and the two Jira files). If you are changing what the agent
+*does*, you are in `prompts/`; if you are changing what happens *around* it, you are in the
+Engine — which no golem edits, so that is a pull request against Watchtower.
 
-### `src/` — read it in this order
+### The Engine's modules — read them in this order
 
 | File | |
 |---|---|
-| `main.mts` | the entry point: the banner, the orphan check, and the scheduler. Nothing else |
-| `workflow.mts` | the state machine — what to do with a new issue, and with anything you say on its pull request |
-| `phases.mts` | the agent runs, and how a container is configured for them |
-| `tracker.mts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
-| `trackers/github.mts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
-| `trackers/jira.mts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, the transition map and its flow per issue type, and the subtask rule that decides which half of a story this repository implements — see below |
-| `forge.mts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
-| `notify.mts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
-| `state.mts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
-| `config.mts` | every knob, every path, every marker. Start here |
-| `env.mts` | the two env files and the rule that keeps them apart — imported first by `config.mts`, for its side effect |
-| `types.mts` | the shapes that travel between the modules, `Tracked` above all |
-| `shell.mts` | `git`, `gh`, and the timestamped log line |
-| `shutdown.mts` | Ctrl-C, and the sleep that returns early for it |
-| `sandbox.mts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test |
-| `slack.mts` | the transport: `chat.postMessage` over a bot token |
-| `watchtower.mts` | the other transport: the dashboard's event emitter, the identifiers, and the heartbeat |
-| `smoke.mts` | the health check — `pnpm sandcastle:smoke` |
-| `jira-smoke.mts` | the other health check — `pnpm sandcastle:jira-smoke`, the host's half: credentials, project, newest issue |
+| `main.ts` | the entry point: the banner, the orphan check, and the scheduler. Nothing else |
+| `workflow.ts` | the state machine — what to do with a new issue, and with anything you say on its pull request |
+| `phases.ts` | the agent runs, and how a container is configured for them |
+| `tracker.ts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
+| `trackers/github.ts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
+| `trackers/jira.ts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, the transition map and its flow per issue type, and the subtask rule that decides which half of a story this repository implements — see below |
+| `forge.ts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
+| `notify.ts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
+| `state.ts` | `state/issue-<n>.json`, one per tracked issue — what survives a restart during review |
+| `config.ts` | every knob, every path, every marker. Start here |
+| `env.ts` | the two env files and the rule that keeps them apart — imported first by `config.ts`, for its side effect |
+| `types.ts` | the shapes that travel between the modules, `Tracked` above all |
+| `shell.ts` | `git`, `gh`, and the timestamped log line |
+| `shutdown.ts` | Ctrl-C, and the sleep that returns early for it |
+| `sandbox.ts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test |
+| `slack.ts` | the transport: `chat.postMessage` over a bot token |
+| `watchtower.ts` | the other transport: the dashboard's event emitter, the identifiers, and the heartbeat |
+| `smoke.ts` | the health check — `pnpm sandcastle:smoke` |
+| `jira-smoke.ts` | the other health check — `pnpm sandcastle:jira-smoke`, the host's half: credentials, project, newest issue |
 
 ### `prompts/` — one per run
 
@@ -122,7 +127,7 @@ Two things live in `.sandcastle` and only two: **code that runs on your machine*
 | `smoke-test.md` | eleven checks proving the sandbox works at all |
 
 A prompt is loaded from disk on every run, so editing one changes the next run with no restart.
-`{{PLACEHOLDER}}` values are filled in by `phases.mts`; a placeholder with no matching
+`{{PLACEHOLDER}}` values are filled in by `phases.ts`; a placeholder with no matching
 `promptArgs` key reaches the agent as literal text, which is the usual cause of a run that
 ignores something you thought you told it.
 
@@ -144,7 +149,7 @@ cp .sandcastle/host.env.example  .sandcastle/host.env
 
 They are split by **which side of the container boundary reads them**, and the split is
 enforced at startup rather than merely documented — see
-[ADR 0009](docs/adr/0009-two-env-files-one-for-each-side.md).
+[ADR 0009](https://github.com/finstreet/watchtower/blob/main/packages/sandcastle-engine/docs/adr/0009-two-env-files-one-for-each-side.md).
 
 **`.sandcastle/.env` — the sandbox's.** Every key listed here is forwarded into the container.
 
@@ -244,7 +249,7 @@ delivered, and it puts the message that needs answering away from the conversati
 
 "Plan posted" asks. "Implementing now" does not. A run that came back `blocked` asks, because
 somebody has to re-label the issue; a pull request that got merged does not, because the person
-reading that message is the one who merged it. `grep notifyAsk src/notify.mts` is the whole list,
+reading that message is the one who merged it. `grep notifyAsk notify.ts` is the whole list,
 and it should stay short — every message added to it makes the rest quieter, and then the one
 that mattered gets muted along with them. That is the same argument that removed the progress
 heartbeat.
@@ -289,7 +294,7 @@ loses nothing. What is at stake when it fails is a card being briefly wrong, nev
 
 **One thing it remembers that the factory does not.** A re-labelled issue is planned from scratch
 as the *next attempt* of the same task, and the watcher cannot know that — its state file was
-deleted when the last attempt ended. So `watchtower.mts` keeps a counter in
+deleted when the last attempt ended. So `watchtower.ts` keeps a counter in
 `.sandcastle/watchtower/generations.json`, bumped once per plan. Delete that directory and
 attempts count from 1 again, which Watchtower will decline as a step backwards until a fresh
 plan counts past it.
@@ -365,7 +370,7 @@ appear on the issue with no factory-side integration at all.
 
 **Credentials: `JIRA_EMAIL` and `JIRA_API_TOKEN`, from `.sandcastle/host.env` or the shell —
 never from `.sandcastle/.env`.** Every key in that file is forwarded into the container, and no
-tracker credential may enter the sandbox; `src/env.mts` refuses to start the watcher if one is
+tracker credential may enter the sandbox; `env.ts` refuses to start the watcher if one is
 listed there, and the smoke test asserts their absence the same way it does `GH_TOKEN`'s. Mint the token at id.atlassian.com → Security → API tokens (it authenticates as
 you; a service account is a recorded follow-up). With Jira selected and either credential
 missing or rejected, the watcher refuses to start and says what to fix.
@@ -810,7 +815,7 @@ and the branch is an ordinary local branch — committing them needs neither the
 when the run ended) nor the network (a commit writes objects and moves a local ref). A run that
 died *because* the connection dropped can therefore still have its work saved, and saved later:
 `rescueLeftovers()` runs at startup too, which is what covers a Ctrl-C, a `kill`, a closed laptop
-or a crashed host, where nothing in `workflow.mts` ever got to report anything.
+or a crashed host, where nothing in `workflow.ts` ever got to report anything.
 
 What survives is the *files*, never the session — Claude Code ran inside the container and its
 JSONL died with it. A `wip` commit is unverified by construction: the gate runs before the
@@ -829,7 +834,7 @@ next round.
 
 Nothing reviews the diff for you right now: after phase 3 the pull request is pushed, ready, and
 read by nobody but you (though phase 5 will act on what you say about it). The reviewer is written and wired — `prompts/code-review.md`, `reviewCode` in
-`phases.mts`, `codeReview` in `workflow.mts`, the Slack wording in `notify.mts` — but its single
+`phases.ts`, `codeReview` in `workflow.ts`, the Slack wording in `notify.ts` — but its single
 call site is commented out.
 
 That is deliberate for the first runs. What those are for is watching plan → approve →
@@ -841,8 +846,8 @@ doubles the container time per issue before anyone has seen the first pull reque
 
 | | |
 |---|---|
-| `src/workflow.mts` | `await codeReview(shipped, decision.comment);` in `implement`, under the `phase 4, switched off for now` banner |
-| `src/notify.mts` | in `announceAttempt`, prefix the `revise` line with the sentence commented above it |
+| `workflow.ts` | `await codeReview(shipped, decision.comment);` in `implement`, under the `phase 4, switched off for now` banner |
+| `notify.ts` | in `announceAttempt`, prefix the `revise` line with the sentence commented above it |
 
 Both are commented in place with that instruction, so neither is findable only from here.
 
@@ -890,8 +895,8 @@ not caption appears under its own filename.
 
 | | |
 |---|---|
-| `src/workflow.mts` | `await walkthrough(shipped);` in `implement`, under the `phase 6, switched off for now` banner |
-| `src/notify.mts` | in `announceAttempt`, prefix the `revise` line with the phase 6 sentence commented above it |
+| `workflow.ts` | `await walkthrough(shipped);` in `implement`, under the `phase 6, switched off for now` banner |
+| `notify.ts` | in `announceAttempt`, prefix the `revise` line with the phase 6 sentence commented above it |
 | `prompts/walkthrough.md` | Step 2, below — without it the phase runs and photographs nothing |
 
 The first two are commented in place with that instruction, so neither is findable only from here.
@@ -917,7 +922,7 @@ one in as many words. `e2e/pages/auth/LoginPage.ts` already has `loginAsCustomer
 **This is the one container trusted with the application's own credentials.** `AUTH_SECRET`,
 `HMAC_SECRET`, the two API base URLs and a test user's password all reach it, because a login
 against a real backend cannot happen otherwise. It is narrower than it sounds: `appEnv` in
-`src/sandbox.mts` is reached only through `SandboxNeeds`, so no other phase's container holds
+`sandbox.ts` is reached only through `SandboxNeeds`, so no other phase's container holds
 these keys at all. The rule that mattered is intact — no tracker credential, ever, so the
 walkthrough can no more reach GitHub than the reviewer can. What makes it acceptable is the
 values themselves: staging, throwaway, rotatable. Nothing enforces that but the comment on
@@ -929,7 +934,7 @@ so a body can only point at something already in the repository. Each issue's sh
 `sandcastle/shots/issue-<n>` as a single orphan commit, force-pushed — beside the issue branch
 and deliberately not on it, because the diff somebody is reading has no business carrying half a
 megabyte of PNG. Deleting that branch breaks the images in that one description and nothing else.
-`MAX_SHOTS` (6) and `MAX_SHOT_BYTES` (2MB) in `config.mts` bound what any run may add, and
+`MAX_SHOTS` (6) and `MAX_SHOT_BYTES` (2MB) in `config.ts` bound what any run may add, and
 anything dropped is said on the pull request rather than dropped quietly.
 
 `attachShots` reads the live body and replaces only its own marked block, so a description you
@@ -945,7 +950,7 @@ have edited by hand survives a second walkthrough.
 
 None of them change what happens next, for the same reason none of phase 4's do.
 
-**One gap, worth knowing when you read a timeline.** Every other moment in `notify.mts` speaks
+**One gap, worth knowing when you read a timeline.** Every other moment in `notify.ts` speaks
 to Slack and Watchtower together. This one speaks only to Slack: the event catalog in
 `@finstreet/watchtower-golem/events` is a closed union with no `walkthrough.*` in it, and filing
 a screenshot as a neighbouring event would be a lie the dashboard repeats. Closing it is two
@@ -1000,10 +1005,10 @@ request is opened with your credentials — by author it cannot tell itself from
 path when the run ends; issue comments quote it too.
 
 **Stopping.** Ctrl-C in the foreground. It finishes the current step and exits — press
-again to kill it. Backgrounded, send the signal to `tsx`, not to `pnpm`:
+again to kill it. Backgrounded, send the signal to `golem`, not to `pnpm`:
 
 ```sh
-node_modules/.bin/tsx .sandcastle/src/main.mts > watcher.log 2>&1 &
+node_modules/.bin/golem > watcher.log 2>&1 &
 kill -INT %1
 ```
 
@@ -1114,7 +1119,7 @@ that is the only history it moves.
 
 **The host carries `.npmrc` in.** It is gitignored, and a worktree is a checkout of committed
 history, so the container would otherwise install without the `@finstreet` auth line and fail
-on a 401 minutes in. `src/sandbox.mts` reads the host's copy and a startup command writes it into
+on a 401 minutes in. `sandbox.ts` reads the host's copy and a startup command writes it into
 the worktree. The file holds no secret — only a `${NPM_AUTH_TOKEN}` reference, expanded inside
 the container from `.sandcastle/.env`.
 
@@ -1122,13 +1127,13 @@ the container from `.sandcastle/.env`.
 worktree already declares which plugins this repo wants — but declaring is not installing.
 A fresh container has no `~/.claude/plugins` at all and nothing populates it: a `claude --print`
 session runs to completion with zero skills and zero MCP servers, which reads as an agent that
-ignored its tools rather than as missing setup. So `src/sandbox.mts` derives the work from that same
+ignored its tools rather than as missing setup. So `sandbox.ts` derives the work from that same
 file — fetch each marketplace's catalog, then `claude plugin install … -s user`. Installing at
 user scope keeps the container's own `enabledPlugins` out of the tracked settings the agent
 might commit.
 
 **What a run installs is an allowlist, not everything you have enabled.** `SANDBOX_PLUGINS` in
-`src/sandbox.mts` names it in full — `finstreet-dev` and `finstreet-fe` — and settings.json is
+`sandbox.ts` names it in full — `finstreet-dev` and `finstreet-fe` — and settings.json is
 consulted only for where those marketplaces live. The two directions fail differently, which is
 the whole argument: a plugin the sandbox wants and does not get is an agent quietly ignoring this
 repo's conventions, while a plugin it gets and does not want can take the run down in setup,
@@ -1143,7 +1148,7 @@ excluded by name. `playwright` used to be listed beside it, because its MCP serv
 then fails on first use against an image with no browsers; the image carries chromium now, so it
 moved instead to `PLAYWRIGHT`, asked for by the one phase that drives a browser. Which is the
 other half of the same argument: a plugin every phase installs is a plugin every phase can be
-broken by, and four of the five need no browser at all. `SandboxNeeds` in `src/sandbox.mts` is
+broken by, and four of the five need no browser at all. `SandboxNeeds` in `sandbox.ts` is
 how a phase asks — plugins, and the application's own environment. The price of the allowlist is a second edit: a plugin this repo's *runs* need is
 enabled in `.claude/settings.json` **and** named in `SANDBOX_PLUGINS`. Two entries that change
 rarely is a cheap place to pay it, and forgetting the second half is visible in the log as a run

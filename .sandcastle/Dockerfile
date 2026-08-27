@@ -31,7 +31,7 @@ RUN npm install -g pnpm@${PNPM_VERSION}
 # Chromium, for the walkthrough phase: an agent that logs into staging, drives a
 # real browser to the pages a pull request touches, and photographs them. Every
 # other phase is text-only and none of them pay for this at runtime — the layer is
-# built once, and only `walkPages` in src/phases.mts asks for the browser.
+# built once, and only `walkPages` in phases.ts asks for the browser.
 #
 # Keep PLAYWRIGHT_VERSION in sync with @playwright/test in package.json, for the
 # same reason PNPM_VERSION is pinned above and with a nastier failure mode: a
@@ -69,7 +69,7 @@ ENV PNPM_HOME="/home/agent/.local/share/pnpm"
 ENV PATH="/home/agent/.local/bin:$PNPM_HOME:$PATH"
 
 # The container is recreated per run, so `pnpm install` would start from a cold
-# store every time. main.mts bind-mounts a persistent Linux store at the path
+# store every time. main.ts bind-mounts a persistent Linux store at the path
 # below — keep the two in sync:
 #   /home/agent/pnpm-store  ←  ~/.cache/sandcastle-pnpm-store
 # Not the host's own store (~/Library/pnpm/store): that one is darwin-arm64 and

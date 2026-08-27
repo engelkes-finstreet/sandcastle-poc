@@ -5,6 +5,12 @@ pull requests by running Claude Code in disposable containers, with a human deci
 points. This is not the product — the Next.js application the factory operates on has its own
 vocabulary, and none of it belongs here.
 
+The `*.ts` files and the numbered ADRs named below are the **Engine's**
+(`@finstreet/sandcastle-engine`, published from
+[`watchtower/packages/sandcastle-engine`](https://github.com/finstreet/watchtower/tree/main/packages/sandcastle-engine)),
+not this repository's. What is in this repository is the prompts, the Dockerfile and this
+golem's own configuration.
+
 ## Language
 
 ### The work
@@ -18,7 +24,7 @@ _Avoid_: ticket, task, story
 **Tracker**:
 Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
 text, the six lifecycle moments, the release comment, and both renderings of an issue's
-identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with two adapters:
+identity. A port — `tracker.ts`, chosen by `SANDCASTLE_TRACKER` — with two adapters:
 GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
 
@@ -126,7 +132,7 @@ best-effort, unable to hold the branch back — and its opposite in what it hand
 instead of a judgement, which is why it does not have to be a stranger to the code to be worth
 anything. Currently switched off, alongside phase 4, and its prompt's browser-driving step is
 still unwritten. See `0011-the-walkthrough-is-a-photograph-not-a-verdict.md`.
-_Avoid_: smoke test — that is `smoke.mts`, the sandbox's own health check, and the two would be
+_Avoid_: smoke test — that is `smoke.ts`, the sandbox's own health check, and the two would be
 confused constantly; visual review, screenshot review — there is no review here, and a name that
 implies one invites somebody to merge on it
 
@@ -143,6 +149,44 @@ about what is in the picture. Optional by construction, and quoted rather than t
 picture is the record and this is commentary on it.
 
 ### The watcher and its memory
+
+**Golem**:
+One deployment of the factory: a checkout of one repository with its own `.sandcastle/`, its own
+credentials, its own Slack channel and its own board. The unit a repository is served by, and the
+thing there is more than one of — three eco.scale frontends are three golems, and the frontend and
+backend repositories sharing one Jira story are two. See
+`0010-a-golem-takes-its-own-slice-of-a-story.md`, which is about what one golem may claim.
+_Avoid_: instance, deployment on its own — neither says that the repository is the boundary; bot —
+true of every Slack post already, so it distinguishes nothing
+
+**Engine**:
+The Kit-agnostic half of the factory, shipped as `@finstreet/sandcastle-engine` and pinned per
+golem: the watcher, the six phases, the tracker port, the forge, the state files, and every rule
+about the flow. A dependency rather than a starting point — the flow through the tickets is the
+same in every repository, so no golem edits it and none may. See
+`0012-the-engine-ships-the-kit-is-vendored.md`.
+_Avoid_: core, framework — both invite the reading that a repository extends it; watcher — that is
+the process the Engine runs, one part of it rather than the whole
+
+**Kit**:
+What makes a golem competent in one *kind* of repository: the six prompts, the Dockerfile, the
+plugin allowlist, the gate, and the glossary that goes with them. Keyed by stack rather than by
+product — one `nextjs-fe` serves all three eco.scale frontends — and **vendored** into
+`.sandcastle/` rather than installed, so a prompt is read, argued about and edited where the code
+it describes lives. `kit.lock` records which version was vendored and `golem sync` three-way
+merges a newer one, which is what makes an edited prompt a legitimate state rather than a conflict
+somebody re-resolves forever.
+_Avoid_: template, preset — both suggest a one-time copy that never hears from its source again,
+which is the failure `kit.lock` exists to prevent; profile
+
+**Profile**:
+The facts true of one golem and no other: which board, which channel, which subtasks are its own,
+which keys the sandbox may see. `host.env`, `.env`, `jira-transitions.json`, `jira-subtasks.json`,
+and the pinned versions in `kit.lock` — which is to say, the half that already existed before the
+other two had names. The test that separates it from a Kit is whether a second repository on the
+same stack would want the same value: the gate would, the Jira project key would not.
+_Avoid_: config, environment — both are equally true of the Kit's `factory.config.mjs`, and
+telling the two apart is the whole point of the word
 
 **Watcher**:
 The host process that drives everything. One agent run at a time, many issues tracked at once.

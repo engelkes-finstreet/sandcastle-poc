@@ -14,11 +14,10 @@
     "e2e:report": "playwright show-report",
     "e2e:headed": "playwright test --headed --project=chromium",
     "e2e:standalone": "pnpm build:e2e && E2E_STANDALONE=true pnpm e2e",
-    "sandcastle": "tsx .sandcastle/src/main.mts",
-    "sandcastle:build-image": "sandcastle docker build-image --dockerfile .sandcastle/Dockerfile",
-    "sandcastle:jira-smoke": "SANDCASTLE_TRACKER=jira tsx .sandcastle/src/jira-smoke.mts",
-    "sandcastle:smoke": "tsx .sandcastle/src/smoke.mts",
-    "sandcastle:typecheck": "tsc --noEmit -p .sandcastle"
+    "sandcastle": "golem",
+    "sandcastle:build-image": "golem build-image",
+    "sandcastle:jira-smoke": "SANDCASTLE_TRACKER=jira golem jira-smoke",
+    "sandcastle:smoke": "golem smoke"
   },
   "dependencies": {
     "@finstreet/forms": "0.0.200",
@@ -40,10 +39,9 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
-    "@ai-hero/sandcastle": "0.12.0",
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^9.2.0",
-    "@finstreet/watchtower-golem": "^0.2.0",
+    "@finstreet/sandcastle-engine": "0.1.0",
     "@next/eslint-plugin-next": "16.1.6",
     "@pandacss/dev": "0.45.2",
     "@playwright/test": "^1.58.2",
@@ -61,7 +59,6 @@
     "globals": "^16.4.0",
     "mailtrap": "4.3.0",
     "prettier": "3.3.3",
-    "tsx": "^4.23.12",
     "typescript": "^5.6.3"
   }
 }
