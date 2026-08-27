@@ -1,30 +1,31 @@
-# Sandcastle
+# The Golem
 
 An autonomous coding agent for this repo, running in a Docker container.
-[Sandcastle](https://github.com/mattpocock/sandcastle) provides the sandbox; everything in
-this directory is the wiring around it.
+[Sandcastle](https://github.com/mattpocock/sandcastle) provides the sandbox — it is Matt
+Pocock's library, and the reason this directory is named `.sandcastle/`. Everything in it is
+the **Golem**: the wiring around that sandbox, which is ours.
 
 **The watcher's code is not in this directory.** It is the **Engine** —
-`@finstreet/sandcastle-engine`, a pinned devDependency published from
-[`watchtower/packages/sandcastle-engine`](https://github.com/finstreet/watchtower/tree/main/packages/sandcastle-engine),
+`@finstreet/golem-engine`, a pinned devDependency published from
+[`watchtower/packages/golem-engine`](https://github.com/finstreet/watchtower/tree/main/packages/golem-engine),
 which is also where its ADRs live. Every `*.ts` file named below is a module of that package.
 What is left here is the prompts, the Dockerfile and this golem's own configuration.
 
 `main.ts` is the watcher: a long-running host process that turns
-`Sandcastle`-labelled GitHub issues into pull requests, stops for review at two points, and
+`Golem`-labelled GitHub issues into pull requests, stops for review at two points, and
 acts on what you say at both. It runs **one agent at a time but tracks as many issues as it
 has state for**, so nothing waits on you. It never merges.
 
 ```
-pnpm sandcastle:build-image   # once, and after any Dockerfile change
-pnpm sandcastle               # start watching — Ctrl-C to stop
-pnpm sandcastle:smoke         # health-check the sandbox itself
+pnpm golem:build-image   # once, and after any Dockerfile change
+pnpm golem               # start watching — Ctrl-C to stop
+pnpm golem:smoke         # health-check the sandbox itself
 ```
 
 ## What one issue looks like
 
 ```
-poll GitHub every 2 minutes for open issues labelled `Sandcastle`
+poll GitHub every 2 minutes for open issues labelled `Golem`
    ↓  oldest first
 post to Slack: "🏰 Planning #n"   ← every later message threads under this one
    ↓
@@ -32,7 +33,7 @@ PHASE 1 · container: the agent runs the `kickoff` skill; its task list IS the p
    ↓  the plan comes back through an <plan> tag, not a file
 host: one empty commit, git push, gh pr create --draft   ← your credentials, not the sandbox's
    ↓  the plan IS the pull request description
-label swap → `Sandcastle:awaiting-approval`, state written to state/issue-n.json
+label swap → `Golem:awaiting-approval`, state written to state/issue-n.json
    ↓
 PHASE 2 · you read the plan and comment on the pull request
    ↓  no container is alive here; this can take days, and the watcher can restart
@@ -53,7 +54,7 @@ PHASE 6 · container: a FRESH session logs into staging, drives a browser to the
    ↓  diff touches, and saves a screenshot of each
 host: the shots go on a branch of their own and into the pull request description
    ↓  ⚠ SWITCHED OFF right now, and its browser step is unwritten. See below
-label swap → `Sandcastle:awaiting-revision`, both watermarks reset
+label swap → `Golem:awaiting-revision`, both watermarks reset
    ↓
 PHASE 5 · you read the shipped code and comment on the pull request
    ↓  no container is alive here either; the watcher is off servicing other issues
@@ -70,7 +71,7 @@ planning the next issue, implementing a third and answering a comment on a fourt
 time, in issue order, tracked issues before new ones. See
 `docs/adr/0006-a-shipped-pull-request-still-listens.md`.
 
-Branches are named `sandcastle/issue-<n>` and cut from `origin/main`. Pull requests carry
+Branches are named `golem/issue-<n>` and cut from `origin/main`. Pull requests carry
 `Closes #<n>`, so the issue closes when you merge.
 
 ## Files
@@ -98,8 +99,8 @@ Engine — which no golem edits, so that is a pull request against Watchtower.
 | `main.ts` | the entry point: the banner, the orphan check, and the scheduler. Nothing else |
 | `workflow.ts` | the state machine — what to do with a new issue, and with anything you say on its pull request |
 | `phases.ts` | the agent runs, and how a container is configured for them |
-| `tracker.ts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `SANDCASTLE_TRACKER` picks the adapter |
-| `trackers/github.ts` | the GitHub adapter: the `Sandcastle` label family, `gh issue` reads, the release comment |
+| `tracker.ts` | the Tracker port: where work comes from, and how the watcher's state is mirrored back. `GOLEM_TRACKER` picks the adapter |
+| `trackers/github.ts` | the GitHub adapter: the `Golem` label family, `gh issue` reads, the release comment |
 | `trackers/jira.ts` | the Jira adapter: the same labels via JQL and REST v3, the comments GitHub's `Closes` clause makes unnecessary there, the transition map and its flow per issue type, and the subtask rule that decides which half of a story this repository implements — see below |
 | `forge.ts` | everything pull-request-shaped: the draft pull request that carries the plan, comments, trigger words. Plain GitHub, not a port — see `docs/adr/0008` |
 | `notify.ts` | every message the watcher sends, in the order a run sends them — Slack and Watchtower both |
@@ -112,8 +113,8 @@ Engine — which no golem edits, so that is a pull request against Watchtower.
 | `sandbox.ts` | store mount, `.npmrc` injection, plugin install and startup commands, shared with the smoke test |
 | `slack.ts` | the transport: `chat.postMessage` over a bot token |
 | `watchtower.ts` | the other transport: the dashboard's event emitter, the identifiers, and the heartbeat |
-| `smoke.ts` | the health check — `pnpm sandcastle:smoke` |
-| `jira-smoke.ts` | the other health check — `pnpm sandcastle:jira-smoke`, the host's half: credentials, project, newest issue |
+| `smoke.ts` | the health check — `pnpm golem:smoke` |
+| `jira-smoke.ts` | the other health check — `pnpm golem:jira-smoke`, the host's half: credentials, project, newest issue |
 
 ### `prompts/` — one per run
 
@@ -133,7 +134,7 @@ ignores something you thought you told it.
 
 ## Setup
 
-**1. Build the image.** `pnpm sandcastle:build-image`. Takes a couple of minutes; the result is
+**1. Build the image.** `pnpm golem:build-image`. Takes a couple of minutes; the result is
 ~525MB and holds no application dependencies — those arrive per run from the mounted pnpm store.
 
 > The sandcastle CLI swallows each build step's stderr, so a failure can look like success.
@@ -149,7 +150,7 @@ cp .sandcastle/host.env.example  .sandcastle/host.env
 
 They are split by **which side of the container boundary reads them**, and the split is
 enforced at startup rather than merely documented — see
-[ADR 0009](https://github.com/finstreet/watchtower/blob/main/packages/sandcastle-engine/docs/adr/0009-two-env-files-one-for-each-side.md).
+[ADR 0009](https://github.com/finstreet/watchtower/blob/main/packages/golem-engine/docs/adr/0009-two-env-files-one-for-each-side.md).
 
 **`.sandcastle/.env` — the sandbox's.** Every key listed here is forwarded into the container.
 
@@ -171,7 +172,7 @@ the agent gets to see.
 
 | Key | |
 |---|---|
-| `SANDCASTLE_TRACKER` | optional, `github` (default) or `jira` |
+| `GOLEM_TRACKER` | optional, `github` (default) or `jira` |
 | `JIRA_BASE_URL`, `JIRA_PROJECT`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | the Jira site, project key and credentials, when the tracker is `jira` |
 | `SLACK_BOT_TOKEN` | optional, `xoxb-…`, from a Slack app with the `chat:write` bot scope |
 | `SLACK_CHANNEL` | optional, the channel ID (`C0123…`) — the bot must be invited to it |
@@ -179,7 +180,7 @@ the agent gets to see.
 | `WATCHTOWER_URL` | optional, the Watchtower api's origin (`https://…`) — both this and the key come from its settings page |
 | `WATCHTOWER_API_KEY` | optional, `wt_…`, this repository's Project key. Shown once, at creation, and stored only as a hash |
 
-The shell still wins over this file, so `SANDCASTLE_POLL_SECONDS=10 pnpm sandcastle` changes one
+The shell still wins over this file, so `GOLEM_POLL_SECONDS=10 pnpm golem` changes one
 run without editing anything.
 
 Per checkout rather than per machine, which is what makes **more than one golem on one machine**
@@ -301,11 +302,11 @@ plan counts past it.
 
 [Watchtower]: https://github.com/finstreet/watchtower
 
-**3. Check the sandbox.** `pnpm sandcastle:smoke` — repo readable, writes land, dependencies
+**3. Check the sandbox.** `pnpm golem:smoke` — repo readable, writes land, dependencies
 install as Linux binaries, and `tsc --noEmit` / `pnpm lint` / `pnpm build` all pass. Do this
 before blaming the agent for anything.
 
-**4. Label an issue** `Sandcastle` and start the watcher.
+**4. Label an issue** `Golem` and start the watcher.
 
 ## Configuration
 
@@ -313,15 +314,15 @@ Environment variables, all optional:
 
 | | Default | |
 |---|---|---|
-| `SANDCASTLE_BASE` | `origin/main` | what branches are cut from, and what PRs target |
-| `SANDCASTLE_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state: `github` or `jira`. Anything else refuses to start |
-| `SANDCASTLE_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
+| `GOLEM_BASE` | `origin/main` | what branches are cut from, and what PRs target |
+| `GOLEM_TRACKER` | `github` | which tracker adapter reads the queue and mirrors state: `github` or `jira`. Anything else refuses to start |
+| `GOLEM_POLL_SECONDS` | `120` | how often to check GitHub. One `gh pr view` per tracked issue per poll |
 | `JIRA_BASE_URL` | `https://finstreet-team.atlassian.net` | the Jira Cloud site, when the tracker is `jira` |
 | `JIRA_PROJECT` | `ESCB` | the Jira project whose issues feed the factory |
 | `JIRA_EMAIL`, `JIRA_API_TOKEN` | — | Jira credentials, **`host.env` or the shell — never `.sandcastle/.env`**. See below |
-| `SANDCASTLE_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
-| `SANDCASTLE_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
-| `SANDCASTLE_WALKTHROUGH_MODEL` | `sonnet` | the model phase 6 drives the browser on, when phase 6 is on |
+| `GOLEM_MODEL` | `opus` | passed to Claude Code as `--model` for planning and implementing |
+| `GOLEM_REVIEW_MODEL` | `sonnet` | the model phase 4 reviews on, when phase 4 is on |
+| `GOLEM_WALKTHROUGH_MODEL` | `sonnet` | the model phase 6 drives the browser on, when phase 6 is on |
 | `SLACK_BOT_TOKEN`, `SLACK_CHANNEL`, `SLACK_MENTION` | — | override `host.env` |
 | `WATCHTOWER_URL`, `WATCHTOWER_API_KEY` | — | override `host.env` |
 
@@ -337,9 +338,9 @@ neither is a property of the shell that starts the watcher. Both are described b
 
 ### Jira as the tracker
 
-`SANDCASTLE_TRACKER=jira` points the *intake* at Jira; everything else stays exactly where it
-was. A team member labels an ESCB issue **`Sandcastle`** in Jira, the watcher finds it by JQL
-(`project = ESCB AND labels = Sandcastle AND statusCategory != Done`, oldest first), and from
+`GOLEM_TRACKER=jira` points the *intake* at Jira; everything else stays exactly where it
+was. A team member labels an ESCB issue **`Golem`** in Jira, the watcher finds it by JQL
+(`project = ESCB AND labels = Golem AND statusCategory != Done`, oldest first), and from
 there the life is the one described above — the branch, the plan pull request,
 `approve`/`revise`/`abandon`, the merge — all on GitHub. The issue's summary, description and
 comments are flattened out of Jira's document format and injected into the prompts as
@@ -352,8 +353,8 @@ other, is the subtask rule below.
 
 What Jira sees back is deliberately thin — links and state, never prose:
 
-- the same three labels the GitHub adapter uses (`Sandcastle`, `Sandcastle:awaiting-approval`,
-  `Sandcastle:awaiting-revision`), swapped at the same moments. Jira creates a label the first
+- the same three labels the GitHub adapter uses (`Golem`, `Golem:awaiting-approval`,
+  `Golem:awaiting-revision`), swapped at the same moments. Jira creates a label the first
   time it is added, so there is no ensure-labels step;
 - one comment with the pull request link when the plan is posted;
 - one comment when the pull request merges (Jira has no `Closes` clause, so the `shipped`
@@ -458,7 +459,7 @@ Four more things worth knowing:
   list with an empty `mine` is a startup failure naming the file — the same rule the transition
   map follows, for the same reason.
 
-To try it without a watcher running, `pnpm sandcastle:jira-smoke` prints the rule under the
+To try it without a watcher running, `pnpm golem:jira-smoke` prints the rule under the
 banner and then the decision it reached for every labelled story:
 
 ```
@@ -467,7 +468,7 @@ repository; a story with neither is worked whole.
   jira: EBS-81 → EBS-83 — the "[FE]" work on it (leaving EBS-82)
   jira: EBS-90 left for another repository's golem — it has no "[FE]" subtask, and EBS-91
         belongs to another repository
-  queue: 1 issue(s) labelled "Sandcastle", not Done, and this repository's work
+  queue: 1 issue(s) labelled "Golem", not Done, and this repository's work
 ```
 
 #### The transition map
@@ -513,7 +514,7 @@ mirror is labels only and Jira behaves exactly as it did before this existed.
 
 `awaiting-approval` has nothing honest to move to: ESCB has no status for *a plan is waiting for a
 human*, and `In CodeReview` would be a lie, because no code exists yet. The issue stays In
-Progress and the `Sandcastle:awaiting-approval` label carries that state on its own. `implementing`
+Progress and the `Golem:awaiting-approval` label carries that state on its own. `implementing`
 would ask for `In progress` on an issue that is already In Progress — which Jira does not offer
 from there, so it would print a skip line every run to change nothing. `shipped` is empty because
 the agreement is that a human merges the pull request and moves Jira with it. And `stopped` is
@@ -587,7 +588,7 @@ costs none, because it never has to ask.
   transition would drag the issue back out of the status shipping just put it in. This is why
   `stopped` is empty and would stay empty even if `shipped` were filled in.
 - **Nothing is ever transitioned back.** If a run fails before the issue is tracked, the
-  `Sandcastle` label comes off with a comment (as it always did) but the `picked-up` transition
+  `Golem` label comes off with a comment (as it always did) but the `picked-up` transition
   stands: the map has no reverse. Re-adding the label picks the issue up again, and the
   `picked-up` transition its status no longer offers is skipped with a log line.
 - **What moves is what the run implements.** On a story scoped to a `[FE]` subtask by
@@ -621,7 +622,7 @@ issue in ESCB — the transitions this exercises are the real ones on the real w
 **1. Credentials, in `.sandcastle/host.env`.** Never in `.sandcastle/.env`:
 
 ```
-SANDCASTLE_TRACKER=jira
+GOLEM_TRACKER=jira
 JIRA_EMAIL=you@finstreet.de
 JIRA_API_TOKEN=…                   # id.atlassian.com → Security → API tokens
 ```
@@ -632,7 +633,7 @@ file is per checkout, which is what a second golem on the same machine needs.
 Then prove them before involving the watcher at all:
 
 ```bash
-pnpm sandcastle:jira-smoke
+pnpm golem:jira-smoke
 ```
 
 Three questions in the order they can fail — are the credentials accepted, is `JIRA_PROJECT`
@@ -648,7 +649,7 @@ issue in the project, because a key and a summary you recognise is what tells yo
 
        status    To Do
        created   2026-08-24 18:02 by …
-       labels    Sandcastle
+       labels    Golem
        url       https://finstreet-team.atlassian.net/browse/ESCB-128
 
 […] Jira is reachable, and ESCB is the project the watcher would take work from.
@@ -656,7 +657,7 @@ issue in the project, because a key and a summary you recognise is what tells yo
 
 Every step is a GET, so it is safe against the production site and safe to re-run while you sort
 a token out. Whichever step fails says what to fix — a rejected token, a project the account
-cannot browse, a site that is not Jira Cloud. It is the host's half of `pnpm sandcastle:smoke`,
+cannot browse, a site that is not Jira Cloud. It is the host's half of `pnpm golem:smoke`,
 which checks the *container*, where these credentials deliberately do not exist.
 
 **2. Learn the transition names from the issue itself.** Names, not board columns: the button
@@ -685,9 +686,9 @@ committed map already does this, and either shape says it:
 ```
 
 **4. A scratch issue with a real, tiny task.** Give it a summary and a description an agent can
-act on ("add a `README` line documenting `pnpm sandcastle:smoke`") rather than a placeholder: an
+act on ("add a `README` line documenting `pnpm golem:smoke`") rather than a placeholder: an
 agent that declines to plan releases the issue right after the pickup, and every later moment
-goes untested. Label it **`Sandcastle`**.
+goes untested. Label it **`Golem`**.
 
 To exercise the subtask rule as well, make it a story with two subtasks — one `[FE]`, one `[BE]`
 — and put the actual task in the `[FE]` one. Then the pickup line names which subtask it took,
@@ -699,10 +700,10 @@ land on the subtask rather than on the story. A second scratch story with a `[BE
 factory is running from as the base:
 
 ```bash
-SANDCASTLE_TRACKER=jira \
-SANDCASTLE_POLL_SECONDS=30 \
-SANDCASTLE_BASE=origin/sandcastle/epic-10 \
-pnpm sandcastle
+GOLEM_TRACKER=jira \
+GOLEM_POLL_SECONDS=30 \
+GOLEM_BASE=origin/golem/epic-10 \
+pnpm golem
 ```
 
 The first four lines answer everything about configuration:
@@ -711,7 +712,7 @@ The first four lines answer everything about configuration:
 Jira: authenticated as … against https://finstreet-team.atlassian.net.
 Jira: transitions — picked-up → "In progress", awaiting-revision → "Ready for CR".
 Jira: subtasks — working the "[FE]" subtask of a labelled story, leaving "[BE]" to another repository; a story with neither is worked whole.
-Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandcastle".
+Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Golem".
 ```
 
 **6. What to check, moment by moment.** The log line is the claim; Jira is the evidence.
@@ -719,7 +720,7 @@ Watching ESCB on https://finstreet-team.atlassian.net for issues labelled "Sandc
 | After | The log says | Check in Jira |
 |---|---|---|
 | pickup | `jira: ESCB-123 → ESCB-124 — the "[FE]" work on it`, then `jira: ESCB-124 → "In progress" (picked-up)` | the **subtask** moved column, and its History tab records it. Where the story has no `[FE]` subtask, both lines name the story instead |
-| the plan is posted | `jira: … (awaiting-approval)`, if configured | `Sandcastle` swapped for `Sandcastle:awaiting-approval`, a comment with the pull request link, and the branch and PR under **Development** — that panel is Jira matching the bare key, with no integration on our side |
+| the plan is posted | `jira: … (awaiting-approval)`, if configured | `Golem` swapped for `Golem:awaiting-approval`, a comment with the pull request link, and the branch and PR under **Development** — that panel is Jira matching the bare key, with no integration on our side |
 | you comment `approve` | nothing from `implementing`, which is unconfigured | the column has not moved: the issue was already In Progress |
 | the implementation pull request goes up | `jira: ESCB-124 → "Ready for CR" (awaiting-revision)` | the **subtask** is In CodeReview, its History records it, and the pull request is marked ready for review |
 | you merge | nothing from `shipped`, and nothing from the `stopped` one second later | the column is yours to move — this is the moment to confirm the golem did **not** touch it |
@@ -753,7 +754,7 @@ pull request, but the rest is yours to remove:
 
 ```bash
 rm -f .sandcastle/state/issue-ESCB-123.json .sandcastle/logs/sandcastle-issue-ESCB-123.log
-git push origin --delete sandcastle/issue-ESCB-123
+git push origin --delete golem/issue-ESCB-123
 ```
 
 and transition the issue back by hand — the map has no reverse, on purpose. If you filled the
@@ -763,7 +764,7 @@ name in there configures it for everybody.
 ## Outcomes
 
 **Phase 1** ends the issue's turn in one of two ways. Either a draft pull request exists and the
-issue now wears `Sandcastle:awaiting-approval`, or the label comes off with a comment saying
+issue now wears `Golem:awaiting-approval`, or the label comes off with a comment saying
 why — the agent declined to plan (`BLOCKED:`), or the run itself failed. Re-add the label to
 ask for another attempt.
 
@@ -776,12 +777,12 @@ ask for another attempt.
 | `no-signal` | Run died: idle timeout, crash, or a host-side failure. Nothing pushed. | no |
 | `no-changes` | Agent said done but committed nothing. | no |
 
-In every case except `shipped` the `Sandcastle:awaiting-approval` label comes off and the state
+In every case except `shipped` the `Golem:awaiting-approval` label comes off and the state
 file is deleted, so the watcher stops rather than re-reading an approval it already acted on.
-Starting over means re-adding the **`Sandcastle`** label, which plans from scratch — an approved
+Starting over means re-adding the **`Golem`** label, which plans from scratch — an approved
 plan is not retried on its own, because whatever broke the first attempt is still there.
 
-On `shipped`, the label becomes `Sandcastle:awaiting-revision` and the state file stays. That is
+On `shipped`, the label becomes `Golem:awaiting-revision` and the state file stays. That is
 what lets phase 5 exist.
 
 **Phase 5** ends the same four ways, and the issue stays tracked through all of them — a
@@ -821,13 +822,13 @@ What survives is the *files*, never the session — Claude Code ran inside the c
 JSONL died with it. A `wip` commit is unverified by construction: the gate runs before the
 agent's own commit, so anything the host rescues never reached it. Treat it as a starting point
 for the next attempt, which is exactly how `prompts/implement-plan.md` tells the next agent to
-treat it. `git log sandcastle/issue-<n>` finds it; `git show` reads it.
+treat it. `git log golem/issue-<n>` finds it; `git show` reads it.
 
 **The host never pushes it — but that is not the same as it never being pushed.** A `wip` commit
 sits on an ordinary branch, so the next run that succeeds on that branch pushes it along with
 its own work, and it turns up in the diff on the pull request. The comment and the Slack line say
 so, because a `git log` on a pull request under review would find it out either way. If you would
-rather it never appeared, `git reset --hard origin/sandcastle/issue-<n>` on the host before the
+rather it never appeared, `git reset --hard origin/golem/issue-<n>` on the host before the
 next round.
 
 ### Phase 4 is switched off
@@ -863,7 +864,7 @@ are a comment on the pull request:
 
 None of them change what happens next. The pull request is already pushed and ready either way,
 and the findings are yours to act on or ignore. A verdict is not a gate, and **the reviewer has
-no path into phase 5**: its comments carry the `<!-- sandcastle -->` marker, so `decide` cannot
+no path into phase 5**: its comments carry the `<!-- golem -->` marker, so `decide` cannot
 read them as a change request. Switching phase 4 on cannot turn phase 5 into an agent reviewing
 and then fixing itself — the line `docs/adr/0002-…` drew and `0006` keeps.
 
@@ -916,7 +917,7 @@ one in as many words. `e2e/pages/auth/LoginPage.ts` already has `loginAsCustomer
 
 | | |
 |---|---|
-| `pnpm sandcastle:build-image` | the chromium layer is new, so an image built before this phase existed has no browser |
+| `pnpm golem:build-image` | the chromium layer is new, so an image built before this phase existed has no browser |
 | `.env`, and `.env.e2e` | read off the host and written into the walkthrough's worktree, exactly as `.npmrc` is. Missing files are a warning at run time, not a refusal to start — `.env.e2e` does not exist in a fresh clone, and without it the `E2E_TEST_*` credentials fall back to placeholders and the login will fail |
 
 **This is the one container trusted with the application's own credentials.** `AUTH_SECRET`,
@@ -931,7 +932,7 @@ container a place production credentials have been.
 
 **Where the pictures live.** GitHub has no public API for uploading an image to a pull request,
 so a body can only point at something already in the repository. Each issue's shots go on
-`sandcastle/shots/issue-<n>` as a single orphan commit, force-pushed — beside the issue branch
+`golem/shots/issue-<n>` as a single orphan commit, force-pushed — beside the issue branch
 and deliberately not on it, because the diff somebody is reading has no business carrying half a
 megabyte of PNG. Deleting that branch breaks the images in that one description and nothing else.
 `MAX_SHOTS` (6) and `MAX_SHOT_BYTES` (2MB) in `config.ts` bound what any run may add, and
@@ -964,7 +965,7 @@ schemas in that package and two `tell` calls here.
 the implementation run as `{{APPROVAL}}`, and the prompt tells it that a nudge, a preference or
 a "yes, but" overrides the plan on that point. `approve, but use the shared ConfirmationModal`
 is a complete review. Anything larger than a clause is a different plan: `abandon` and re-add
-the **`Sandcastle`** label to plan it again from scratch, in a fresh container that reads your
+the **`Golem`** label to plan it again from scratch, in a fresh container that reads your
 comments on the issue as ordinary context.
 
 **Any other comment changes nothing.** The watcher posts one reply saying so and goes back to
@@ -996,7 +997,7 @@ GitHub review submissions are not in the payload `gh pr view --json comments` re
 watcher never sees them. Ordinary pull request comments are what it reads. This is a known
 limitation, not a bug.
 
-The watcher ignores its own comments by an HTML marker (`<!-- sandcastle -->`), because the pull
+The watcher ignores its own comments by an HTML marker (`<!-- golem -->`), because the pull
 request is opened with your credentials — by author it cannot tell itself from you.
 
 ## Day to day
@@ -1019,11 +1020,11 @@ watcher running.
 agent left nothing uncommitted; the watcher clears any leftovers before starting the next
 issue, so at most one sits around. Nothing is cleared before its contents are committed — the
 rescue described under *Outcomes* runs first, so deleting a worktree can never delete work. The
-pnpm store at `~/.cache/sandcastle-pnpm-store` grows to ~2GB once and is then reused — deleting
+pnpm store at `~/.cache/golem-pnpm-store` grows to ~2GB once and is then reused — deleting
 it just means the next run re-downloads.
 
-**Branches.** Merged `sandcastle/issue-<n>` branches are not deleted locally. `git branch
---merged main | grep sandcastle/` finds them.
+**Branches.** Merged `golem/issue-<n>` branches are not deleted locally. `git branch
+--merged main | grep golem/` finds them.
 
 ## Why it is built this way
 
@@ -1205,19 +1206,19 @@ read it.
 | Slack says `not_in_channel` | `/invite @YourApp` in the target channel. |
 | Slack says `invalid_auth` | Wrong or revoked token, or a user token (`xoxp-`) where a bot token (`xoxb-`) is needed. |
 | `pnpm install` fails with `ERR_PNPM_FETCH_401` | `NPM_AUTH_TOKEN` did not reach the container. It must be listed as a key in `.sandcastle/.env` — an export in your shell alone is not forwarded, and `host.env` is never forwarded at all. |
-| Startup says a key `is in .sandcastle/.env` and must move | A host-side key (`JIRA_`, `SLACK_`, `WATCHTOWER_`, `SANDCASTLE_`) is in the file that gets forwarded into the container. Move it to `.sandcastle/host.env`. If it is a credential, rotate it — the guard stops the next run, not the ones already gone. |
+| Startup says a key `is in .sandcastle/.env` and must move | A host-side key (`JIRA_`, `SLACK_`, `WATCHTOWER_`, `GOLEM_`) is in the file that gets forwarded into the container. Move it to `.sandcastle/host.env`. If it is a credential, rotate it — the guard stops the next run, not the ones already gone. |
 | Startup says a key `is in .sandcastle/host.env` and will not reach the agent | The reverse: a sandbox credential in the file that is never forwarded. Move it to `.sandcastle/.env`. |
 | `claude mcp list` shows `finstreet-mcp` failing | `FINSTREET_MCP_TOKEN` did not reach the container — list it as a key in `.sandcastle/.env`. The URL resolving means the plugin installed; only the credential is missing. |
 | The agent never uses a skill or an MCP tool | Check the startup command output in the log. `Plugin "x" not found in marketplace "y"` means the catalog was not fetched before the install — almost always because the two were split into separate hooks, which run concurrently. |
-| The watcher ignores an approval you left | Check `.sandcastle/state/`. No file means nothing is polling that pull request — the startup log lists issues in that state. Close the PR and re-add the **Sandcastle** label. |
+| The watcher ignores an approval you left | Check `.sandcastle/state/`. No file means nothing is polling that pull request — the startup log lists issues in that state. Close the PR and re-add the **Golem** label. |
 | The watcher ignored a comment on a shipped PR | Only `revise` and `abandon` are read there, and only at the *start* of the comment. It replies once saying so — if you got no reply either, check `.sandcastle/state/` for that issue. |
 | `revise` did not include your earlier notes | It should: everything since the last run is sent. If a *previous* `revise` already ran on them, they are spent — restate what still matters. |
 | Follow-up rounds ran out | Three is the limit. The watcher stopped tracking it and said so. Merge it, take it from here, or file the rest as its own issue. |
-| `no commits between main and sandcastle/issue-n` | The empty plan commit was not created, so `gh pr create` had no diff. Look for a `git commit-tree`/`update-ref` failure earlier in the log. |
+| `no commits between main and golem/issue-n` | The empty plan commit was not created, so `gh pr create` had no diff. Look for a `git commit-tree`/`update-ref` failure earlier in the log. |
 | Agent immediately reports `blocked` | Read the log. Almost always an issue too vague to implement — add detail and re-label. |
 | A run seems stuck | 15 minutes of total silence ends it. Watch progress with `tail -f .sandcastle/logs/<branch>-*.log`. |
-| A run died mid-implementation (timeout, dropped connection, Ctrl-C) | Its uncommitted files are on the branch as a `wip(#n)` commit — `git log sandcastle/issue-<n>`. Never gated, and the host does not push it. Re-add the **Sandcastle** label and the next attempt starts from it. |
-| A `wip(#n)` commit you do not want | `git reset --hard origin/sandcastle/issue-<n>` on the host, or delete the branch. Do it before the next round on that branch: the host never pushes a `wip` commit, but the next successful run's push carries it into the pull request. |
+| A run died mid-implementation (timeout, dropped connection, Ctrl-C) | Its uncommitted files are on the branch as a `wip(#n)` commit — `git log golem/issue-<n>`. Never gated, and the host does not push it. Re-add the **Golem** label and the next attempt starts from it. |
+| A `wip(#n)` commit you do not want | `git reset --hard origin/golem/issue-<n>` on the host, or delete the branch. Do it before the next round on that branch: the host never pushes a `wip` commit, but the next successful run's push carries it into the pull request. |
 | Slack says *No code review* | The phase-4 run failed or came back without a `<review>` block. The implementation is unaffected — it is pushed and ready. The reason is in the same branch log, after the implementation's. |
-| The review says the reviewer left commits | It committed despite being told not to. Those commits are local and never pushed, so the pull request is unaffected: `git reset --hard origin/sandcastle/issue-<n>` clears them. |
+| The review says the reviewer left commits | It committed despite being told not to. Those commits are local and never pushed, so the pull request is unaffected: `git reset --hard origin/golem/issue-<n>` clears them. |
 | The code review repeats the plan back at you | It read `{{PLAN}}` and not the diff. Check the log for the `git diff` calls; if the branch had no commits to read, the implementation is the thing to look at. |

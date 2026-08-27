@@ -66,9 +66,9 @@ importers:
       '@faker-js/faker':
         specifier: ^9.2.0
         version: 9.9.0
-      '@finstreet/sandcastle-engine':
-        specifier: 0.1.0
-        version: 0.1.0
+      '@finstreet/golem-engine':
+        specifier: 0.2.0
+        version: 0.2.0
       '@next/eslint-plugin-next':
         specifier: 16.1.6
         version: 16.1.6
@@ -407,9 +407,12 @@ packages:
       react: 19.0.0
       react-dom: 19.0.0
 
-  '@finstreet/sandcastle-engine@0.1.0':
-    resolution: {integrity: sha512-rGasOpHd7XpGpVUm+HA+ZPl8b0pxDGZl1SRDqpAbPS6vYRKioVy1bBbcUzPaBd+SXCe1okXf1tn++BZLo2NQaA==, tarball: https://npm.pkg.github.com/download/@finstreet/sandcastle-engine/0.1.0/6ad73ebfa89ac765cabcca0cc9daaed2a3544cdf}
+  '@finstreet/golem-engine@0.2.0':
+    resolution: {integrity: sha512-89F+bffcf50Dcju/wA4dnDcN88fXEI3WHdcKvYttgBSdV9tfP9aUcIaUE/iVeCpfC3APoDehmPXcPIJoEqlphQ==, tarball: https://npm.pkg.github.com/download/@finstreet/golem-engine/0.2.0/dd4166f7369aec83e99f1c4a3b5eb0f63ce9362a}
     hasBin: true
+
+  '@finstreet/golem-events@0.2.0':
+    resolution: {integrity: sha512-gR7bC51L9gkw/n4tPaJ92BAEsCAtagRW8GVppYGvGfv29y9UBYCzRSiijSVkRpRrU82776wpoq27phnOIi55OQ==, tarball: https://npm.pkg.github.com/download/@finstreet/golem-events/0.2.0/2d21284d429c1b69fb845c6b5cef4ecaab834dfd}
 
   '@finstreet/secure-fetch@0.0.88':
     resolution: {integrity: sha512-+OOZ4l1RGh0vTpQcKRCqE1g2wEt1FHpUe+ljR29fS2N3uHs89DWO0LBPPFtJ5X/jIm90izcdrRtkF4ljQO10fg==, tarball: https://npm.pkg.github.com/download/@finstreet/secure-fetch/0.0.88/f9e37c2ae2d9b0cf5bd12863681ea8b3a848c965}
@@ -433,9 +436,6 @@ packages:
       react-dom: ^19.0.0
       react-hook-form: ^7.53.0
       react-icons: ^5.3.0
-
-  '@finstreet/watchtower-golem@0.2.0':
-    resolution: {integrity: sha512-LYDdFRZ4wc/Mx2k43mebCOyqvTF+BSvu6l6C5umbFRFbleTecnU6pxZ+ClkeLq1bdmRzSuOVow3EcFswFxAE9A==, tarball: https://npm.pkg.github.com/download/@finstreet/watchtower-golem/0.2.0/de4a2678d943009b042e2de80c9b552d35ea9b6b}
 
   '@floating-ui/core@1.7.4':
     resolution: {integrity: sha512-C3HlIdsBxszvm5McXlB8PeOEWfBhcGBTZGkGlWc2U0KFY5IwG5OQEuQ8rq52DZmcHDlPLd+YFBK+cZcytwIFWg==}
@@ -2755,13 +2755,17 @@ snapshots:
       - babel-plugin-react-compiler
       - sass
 
-  '@finstreet/sandcastle-engine@0.1.0':
+  '@finstreet/golem-engine@0.2.0':
     dependencies:
       '@ai-hero/sandcastle': 0.12.0
-      '@finstreet/watchtower-golem': 0.2.0
+      '@finstreet/golem-events': 0.2.0
     transitivePeerDependencies:
       - '@daytona/sdk'
       - '@vercel/sandbox'
+
+  '@finstreet/golem-events@0.2.0':
+    dependencies:
+      zod: 4.4.3
 
   '@finstreet/secure-fetch@0.0.88(@playwright/test@1.58.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
@@ -2805,10 +2809,6 @@ snapshots:
       react-icons: 5.5.0(react@19.0.0)
       react-number-format: 5.4.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       use-debounce: 10.0.4(react@19.0.0)
-
-  '@finstreet/watchtower-golem@0.2.0':
-    dependencies:
-      zod: 4.4.3
 
   '@floating-ui/core@1.7.4':
     dependencies:

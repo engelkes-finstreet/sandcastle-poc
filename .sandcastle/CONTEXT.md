@@ -1,15 +1,15 @@
-# The Sandcastle Factory
+# The Golem
 
-The agent factory in `.sandcastle/`: a long-running host process that turns queued issues into
+This repository's agent factory: a long-running host process that turns queued issues into
 pull requests by running Claude Code in disposable containers, with a human deciding at two
-points. This is not the product — the Next.js application the factory operates on has its own
-vocabulary, and none of it belongs here.
+points. Its files live in `.sandcastle/`. This is not the product — the Next.js application
+the Golem operates on has its own vocabulary, and none of it belongs here.
 
 The `*.ts` files and the numbered ADRs named below are the **Engine's**
-(`@finstreet/sandcastle-engine`, published from
-[`watchtower/packages/sandcastle-engine`](https://github.com/finstreet/watchtower/tree/main/packages/sandcastle-engine)),
+(`@finstreet/golem-engine`, published from
+[`watchtower/packages/golem-engine`](https://github.com/finstreet/watchtower/tree/main/packages/golem-engine)),
 not this repository's. What is in this repository is the prompts, the Dockerfile and this
-golem's own configuration.
+Golem's own configuration.
 
 ## Language
 
@@ -17,14 +17,14 @@ golem's own configuration.
 
 **Issue**:
 A unit of work queued in the tracker, identified by an opaque string key. The only way work
-enters the factory. On a GitHub-tracked project it is a GitHub issue wearing the `Sandcastle`
+enters the factory. On a GitHub-tracked project it is a GitHub issue wearing the `Golem`
 label and its key is the issue number as a string.
 _Avoid_: ticket, task, story
 
 **Tracker**:
 Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
 text, the six lifecycle moments, the release comment, and both renderings of an issue's
-identity. A port — `tracker.ts`, chosen by `SANDCASTLE_TRACKER` — with two adapters:
+identity. A port in the Engine — `tracker.ts`, chosen by `GOLEM_TRACKER` — with two adapters:
 GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
 
@@ -132,7 +132,7 @@ best-effort, unable to hold the branch back — and its opposite in what it hand
 instead of a judgement, which is why it does not have to be a stranger to the code to be worth
 anything. Currently switched off, alongside phase 4, and its prompt's browser-driving step is
 still unwritten. See `0011-the-walkthrough-is-a-photograph-not-a-verdict.md`.
-_Avoid_: smoke test — that is `smoke.ts`, the sandbox's own health check, and the two would be
+_Avoid_: smoke test — that is the Engine's `smoke.ts`, the sandbox's own health check, and the two would be
 confused constantly; visual review, screenshot review — there is no review here, and a name that
 implies one invites somebody to merge on it
 
@@ -160,7 +160,7 @@ _Avoid_: instance, deployment on its own — neither says that the repository is
 true of every Slack post already, so it distinguishes nothing
 
 **Engine**:
-The Kit-agnostic half of the factory, shipped as `@finstreet/sandcastle-engine` and pinned per
+The Kit-agnostic half of the factory, shipped as `@finstreet/golem-engine` and pinned per
 golem: the watcher, the six phases, the tracker port, the forge, the state files, and every rule
 about the flow. A dependency rather than a starting point — the flow through the tickets is the
 same in every repository, so no golem edits it and none may. See
@@ -178,6 +178,17 @@ merges a newer one, which is what makes an edited prompt a legitimate state rath
 somebody re-resolves forever.
 _Avoid_: template, preset — both suggest a one-time copy that never hears from its source again,
 which is the failure `kit.lock` exists to prevent; profile
+
+**Sandcastle**:
+`@ai-hero/sandcastle`, Matt Pocock's library — it is what actually runs Claude Code inside a
+container, and it is a dependency of the Engine rather than anything this repository calls.
+The word appears here for two reasons only: the dependency, and the `.sandcastle/` directory,
+whose name the library hardcodes when it reads `.sandcastle/.env`. Everything else in that
+directory is the Golem's and could have lived anywhere; it is one directory rather than two
+because two would be worse.
+_Avoid_: using it for anything we built — the factory is a **Golem**, its shipped half is the
+**Engine**, and the dashboard watching every Golem is **Watchtower**. A label, a branch, an
+env var or a script with "sandcastle" in it is a bug
 
 **Profile**:
 The facts true of one golem and no other: which board, which channel, which subtasks are its own,

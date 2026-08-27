@@ -1,6 +1,6 @@
-# Sandcastle smoke test
+# Golem smoke test
 
-You are running inside a Sandcastle sandbox against **fs-fe-boilerplate** — a single-package
+You are running inside a sandboxed container against **fs-fe-boilerplate** — a single-package
 Next.js 16 app (App Router, Panda CSS, next-intl, next-auth), not a monorepo. There is no
 `apps/`, no `packages/`, no turbo and no database.
 
@@ -54,7 +54,7 @@ going instead of trying to fix it.
    read it back, confirm the contents, then delete it. Confirm `git status --porcelain` no
    longer mentions it.
 5. **Git works.** Report the current branch, `git config user.name` / `user.email` as
-   configured in the sandbox, and confirm the branch is a Sandcastle working branch rather
+   configured in the sandbox, and confirm the branch is a Golem working branch rather
    than `main`.
 6. **Install is complete and authenticated.** `pnpm install` already ran before you started,
    against a pnpm store mounted from the host. Confirm all four:

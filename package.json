@@ -14,10 +14,10 @@
     "e2e:report": "playwright show-report",
     "e2e:headed": "playwright test --headed --project=chromium",
     "e2e:standalone": "pnpm build:e2e && E2E_STANDALONE=true pnpm e2e",
-    "sandcastle": "golem",
-    "sandcastle:build-image": "golem build-image",
-    "sandcastle:jira-smoke": "SANDCASTLE_TRACKER=jira golem jira-smoke",
-    "sandcastle:smoke": "golem smoke"
+    "golem": "golem",
+    "golem:build-image": "golem build-image",
+    "golem:jira-smoke": "GOLEM_TRACKER=jira golem jira-smoke",
+    "golem:smoke": "golem smoke"
   },
   "dependencies": {
     "@finstreet/forms": "0.0.200",
@@ -41,7 +41,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@faker-js/faker": "^9.2.0",
-    "@finstreet/sandcastle-engine": "0.1.0",
+    "@finstreet/golem-engine": "0.2.0",
     "@next/eslint-plugin-next": "16.1.6",
     "@pandacss/dev": "0.45.2",
     "@playwright/test": "^1.58.2",
