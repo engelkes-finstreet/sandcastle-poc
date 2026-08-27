@@ -78,14 +78,14 @@ Branches are named `golem/issue-<n>` and cut from `origin/main`. Pull requests c
 
 ```
 .sandcastle/
-├── prompts/      what the agent is told, one file per phase
+├── prompts/      what the agent is told, one file per phase — vendored from a Kit
 ├── Dockerfile    the image every run starts from
 ├── factory.config.mjs      the gate, the plugin allowlist, the sandbox keys, the models
 ├── .env          the sandbox's secrets — forwarded into the container, gitignored
 ├── host.env      the watcher's own config — never forwarded, gitignored
 ├── jira-transitions.json    moment → Jira transition, one flow per issue type
 ├── jira-subtasks.json       which subtask of a story is this repository's work
-└── logs/ worktrees/ state/ watchtower/    per-run output, gitignored
+└── logs/ worktrees/ state/ watchtower/ rendered/    per-run output, gitignored
 ```
 
 What lives here is **prose the agent reads** (`prompts/`) and **this golem's own
@@ -129,9 +129,22 @@ Engine — which no golem edits, so that is a pull request against Watchtower.
 | `smoke-test.md` | eleven checks proving the sandbox works at all |
 
 A prompt is loaded from disk on every run, so editing one changes the next run with no restart.
-`{{PLACEHOLDER}}` values are filled in by `phases.ts`; a placeholder with no matching
-`promptArgs` key reaches the agent as literal text, which is the usual cause of a run that
-ignores something you thought you told it.
+
+**Two kinds of placeholder, and they are worth telling apart.** Lowercase ones — `{{gate}}` and
+`{{gate_commands}}` — are the Engine's, rendered from `factory.config.mjs` as the prompt is
+loaded, and the same in every run against this repository. UPPERCASE ones — `{{ISSUE_TEXT}}`,
+`{{PLAN}}`, `{{APPROVAL}}` and the rest — are per-run values filled in by `@ai-hero/sandcastle`
+from what `phases.ts` passes.
+
+Neither can go unrendered quietly. A prompt naming a lowercase placeholder the Engine does not
+know, or still holding one after interpolation, stops the watcher at startup with the file and
+the line — because a literal `{{gate}}` reaching an agent does not fail. It reads as nothing in
+particular and comes back as a plan that skipped the gate, on a pull request whose comment says
+the gate was green.
+
+What the agent was actually handed is written to `rendered/`, which is gitignored and overwritten
+each load. Read that rather than `prompts/` when a run did something the prompt does not seem to
+ask for.
 
 ## Setup
 
@@ -342,7 +355,10 @@ Three pieces of configuration are deliberately *not* environment variables, and 
 committed, reviewable files under `.sandcastle/`. `factory.config.mjs` holds the gate, the
 plugin allowlist, the keys that only mean something inside the container, and the two cheap
 phases' models — the watcher refuses to start without it, and a malformed one is a startup
-error naming the file and every problem in it at once. `jira-transitions.json` maps lifecycle moments
+error naming the file and every problem in it at once. The gate is declared there **once**: the
+prompts carry `{{gate}}`, which the Engine renders as it loads them, and the pull-request comments
+that claim the gate was green are built from the same value, so the commands an agent is told to
+run and the commands a pull request claims were green cannot disagree. `jira-transitions.json` maps lifecycle moments
 to Jira workflow transitions, one flow per issue type; `jira-subtasks.json` says which subtask of
 a story this repository implements. Which transitions a project's workflow offers is a property of
 the project, and which discipline a golem writes is a property of the repository it is pointed at —

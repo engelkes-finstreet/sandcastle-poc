@@ -73,13 +73,11 @@ else is doing. They are not yours to do.
    and start writing.
 3. **`CLAUDE.md` at the repo root is binding** where it exists. Its rules about branching,
    pushing and opening pull requests do not apply to you — the host does that.
-4. **Verify.** This repo has no unit or integration test suite, so the gate is all three of:
-   - `pnpm exec tsc --noEmit` — must be clean;
-   - `pnpm lint` — no new errors. One pre-existing warning about an unused
-     `getFspFinancingCaseOverview` is expected; leave it alone;
-   - `pnpm build` — must reach Next's route table.
+4. **Verify.** The gate — every command, and what each has to produce:
 
-   All three must pass before you commit. Quote any failure you cannot legitimately fix rather
+   {{gate}}
+
+   All of them must pass before you commit. Quote any failure you cannot legitimately fix rather
    than working around it. `e2e/` is out of scope: the image has chromium, but only the
    walkthrough phase is handed the application's environment, so nothing here can reach a login.
 5. **Commit.** One commit, or a few well-scoped ones, in the repo's conventional-commit style
@@ -88,7 +86,7 @@ else is doing. They are not yours to do.
 
 ## `messages/de.po` will change under you
 
-Running the gate is not read-only: `pnpm build` makes next-intl extract messages into the
+Running the gate is not read-only: the build step makes next-intl extract messages into the
 tracked `messages/de.po`, and it currently picks up keys from across the codebase that were
 never committed — not just yours. So after the gate:
 
@@ -117,7 +115,7 @@ is the fastest way to lose a reviewer's trust in the rest of it.
 
 ## Tell the reviewer how to try it
 
-The gate proves the code compiles, lints and builds. It proves nothing about whether the
+The gate proves the code holds together. It proves nothing about whether the
 feature *works* — nobody has clicked it, and this container has nothing to click: no staging
 credentials reach it, so there is no running application it could log into. So
 hand that over deliberately: end with instructions for running your change on a Mac, inside a
@@ -151,7 +149,7 @@ No preamble, no restating the plan, no "as described above" — the comment stan
 
 ## Done
 
-When the plan is implemented, all three gate commands pass, everything is committed, and you
+When the plan is implemented, every gate command passes, everything is committed, and you
 have written the `<testing>` block:
 
 <promise>COMPLETE</promise>

@@ -17,15 +17,21 @@ export default defineConfig({
   /**
    * The gate: what an agent must run green before it commits, in order, and what
    * each must produce. This repository has no unit or integration test suite, so
-   * these three are the whole of it — nothing here has been *used*, only compiled,
+   * these three are the whole of it — nothing here has been *used*, only checked,
    * and every pull request the golem opens says so.
    *
-   * The wording is quoted from the prompts rather than invented, because the
-   * prompts are still what the agent reads: `implement-plan.md` and `follow-up.md`
-   * spell this gate out in prose, and `plan-issue.md`, `code-review.md`,
-   * `walkthrough.md` and `smoke-test.md` each name it again. Six places that can
-   * disagree with this file and with each other — rendering them from here is the
-   * next ticket, and until it lands, an edit here has to be an edit there too.
+   * That last sentence is why the claim lives *here* rather than in a prompt: it is
+   * true of this repository and not of the stack, and a Kit that asserted it would
+   * be asserting it about every repository it is vendored into.
+   *
+   * Edit this and everything that names the gate changes with it. The six prompts
+   * carry `{{gate}}` or `{{gate_commands}}` and the Engine renders them as it loads
+   * each one; the two pull-request comments that claim the gate was green build
+   * their sentence from the same value. It used to be prose in all eight, each in
+   * its own words, and nothing kept them in step.
+   *
+   * The wording below is quoted from those prompts rather than invented, so that
+   * single-sourcing changed nothing about what an agent is told.
    */
   gate: [
     { command: "pnpm exec tsc --noEmit", expect: "must be clean" },

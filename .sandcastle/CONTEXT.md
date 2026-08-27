@@ -11,6 +11,10 @@ The `*.ts` files and the numbered ADRs named below are the **Engine's**
 not this repository's. What is in this repository is the prompts, the Dockerfile and this
 Golem's own configuration.
 
+The ADRs are cited below by bare filename. They are not in this repository — read them in the
+installed Engine's `docs/adr/`, or in `packages/golem-engine/docs/adr/` in the Watchtower
+monorepo.
+
 ## Language
 
 ### The work
@@ -24,8 +28,9 @@ _Avoid_: ticket, task, story
 **Tracker**:
 Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
 text, the six lifecycle moments, the release comment, and both renderings of an issue's
-identity. A port in the Engine — `tracker.ts`, chosen by `GOLEM_TRACKER` — with two adapters:
-GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
+identity. A port in the Engine — `tracker.ts`, chosen by `GOLEM_TRACKER` — with two adapters,
+GitHub and Jira. Which one a golem uses is Profile, not stack. See
+`0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
 
 **Moment**:
@@ -43,11 +48,11 @@ _Avoid_: workflow config — the workflow is Jira's, and the map only names move
 
 **Flow**:
 One issue type's workflow, as the transition map sees it: the moments named under `"Sub-task"`, or
-under `"*"` for every type not named. A Jira workflow scheme binds a workflow per issue type, so
-ESCB has two — they use the same words for the two buttons the map fills in today, so the committed
-file is the flat single-flow shape, and they diverge after In CodeReview, which is where a flow per
-type will be needed. Which flow a moment uses is decided by the type of the issue it lands on,
-which for a scoped story is the subtask's, not the story's.
+under `"*"` for every type not named. A Jira workflow scheme binds a workflow per issue type, so a
+project may have more than one. Where they use the same words for the buttons the map fills in, the
+committed file can stay the flat single-flow shape; a flow per type is needed only once they
+diverge. Which flow a moment uses is decided by the type of the issue it lands on, which for a
+scoped story is the subtask's, not the story's.
 _Avoid_: workflow (Jira's word for the whole graph, of which a flow is only the moments we name),
 map per type (there is one map file; a flow is a section of it)
 
@@ -91,9 +96,12 @@ say about it.
 How an attempt ended — shipped, blocked, no-changes, or no-signal. Exactly one per attempt.
 
 **Gate**:
-`tsc --noEmit`, `pnpm lint` and `pnpm build`, green inside the sandbox. This repo has no test
-suite, so the gate is the whole of the automated check: it proves the code compiles, never that
-it works.
+The commands an agent must run green before it commits, in order, and what each has to produce.
+Declared once per golem, in `.sandcastle/factory.config.mjs`, and rendered from there into every
+prompt that names it and into the pull-request comment that claims it passed — so the commands an
+agent is told to run and the commands a pull request claims were green cannot disagree. What the
+gate proves is that the code holds together; it never proves that it works, because nothing in the
+sandbox has used it.
 
 ### The phases
 
