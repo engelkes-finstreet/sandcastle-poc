@@ -49,11 +49,11 @@ host: git push, gh pr ready, comment with the commits and how to test it locally
 PHASE 4 · container: a FRESH session — no memory of the plan or the code — reviews the diff
    ↓  complexity, this repo's standards, and each part against the skill it should have used
 host: comment with the findings and a verdict   ← it reviews, it never fixes
-   ↓  ⚠ SWITCHED OFF right now. See below
+   ↓  ⚠ OPTIONAL, and off in this golem's config. See below
 PHASE 6 · container: a FRESH session logs into staging, drives a browser to the pages this
    ↓  diff touches, and saves a screenshot of each
 host: the shots go on a branch of their own and into the pull request description
-   ↓  ⚠ SWITCHED OFF right now, and its browser step is unwritten. See below
+   ↓  ⚠ OPTIONAL, off here, and its browser step is unwritten. See below
 label swap → `Golem:awaiting-revision`, both watermarks reset
    ↓
 PHASE 5 · you read the shipped code and comment on the pull request
@@ -80,7 +80,7 @@ Branches are named `golem/issue-<n>` and cut from `origin/main`. Pull requests c
 .sandcastle/
 ├── prompts/      what the agent is told, one file per phase — vendored from a Kit
 ├── Dockerfile    the image every run starts from
-├── factory.config.mjs      the gate, the plugin allowlist, the sandbox keys, the models
+├── factory.config.mjs      the gate, the plugin allowlist, the sandbox keys, the phase toggles, the models
 ├── .env          the sandbox's secrets — forwarded into the container, gitignored
 ├── host.env      the watcher's own config — never forwarded, gitignored
 ├── jira-transitions.json    moment → Jira transition, one flow per issue type
@@ -124,8 +124,8 @@ Engine — which no golem edits, so that is a pull request against Watchtower.
 | `plan-issue.md` | phase 1: read the issue, run `kickoff`, return its task list as the plan, change nothing |
 | `implement-plan.md` | phase 3: build the approved plan, and say how to test it by hand |
 | `follow-up.md` | phase 5: make the change a human asked for on a shipped diff, and nothing else |
-| `code-review.md` | phase 4: review the pushed diff along two axes — Standards and Spec — in a session that did not write it. Switched off — see below |
-| `walkthrough.md` | phase 6: log into staging, walk to the pages the diff touches, photograph them. Switched off, and **its Step 2 is an unwritten placeholder** — see below |
+| `code-review.md` | phase 4: review the pushed diff along two axes — Standards and Spec — in a session that did not write it. Optional, and off in this golem's config — see below |
+| `walkthrough.md` | phase 6: log into staging, walk to the pages the diff touches, photograph them. Optional, off in this golem's config, and **its Step 2 is an unwritten placeholder** — see below |
 | `smoke-test.md` | eleven checks proving the sandbox works at all |
 
 A prompt is loaded from disk on every run, so editing one changes the next run with no restart.
@@ -353,12 +353,13 @@ queue rather than like a missing line.
 
 Three pieces of configuration are deliberately *not* environment variables, and all three are
 committed, reviewable files under `.sandcastle/`. `factory.config.mjs` holds the gate, the
-plugin allowlist, the keys that only mean something inside the container, and the two cheap
-phases' models — the watcher refuses to start without it, and a malformed one is a startup
-error naming the file and every problem in it at once. The gate is declared there **once**: the
-prompts carry `{{gate}}`, which the Engine renders as it loads them, and the pull-request comments
-that claim the gate was green are built from the same value, so the commands an agent is told to
-run and the commands a pull request claims were green cannot disagree. `jira-transitions.json` maps lifecycle moments
+plugin allowlist, the keys that only mean something inside the container, which of the two
+optional phases run, and the models those phases run on — the watcher refuses to start without
+it, and a malformed one is a startup error naming the file and every problem in it at once. The
+gate is declared there **once**: the prompts carry `{{gate}}`, which the Engine renders as it
+loads them, and the pull-request comments that claim the gate was green are built from the same
+value, so the commands an agent is told to run and the commands a pull request claims were green
+cannot disagree. `jira-transitions.json` maps lifecycle moments
 to Jira workflow transitions, one flow per issue type; `jira-subtasks.json` says which subtask of
 a story this repository implements. Which transitions a project's workflow offers is a property of
 the project, and which discipline a golem writes is a property of the repository it is pointed at —
@@ -859,26 +860,27 @@ so, because a `git log` on a pull request under review would find it out either 
 rather it never appeared, `git reset --hard origin/golem/issue-<n>` on the host before the
 next round.
 
-### Phase 4 is switched off
+### Phase 4 is optional, and this golem has it off
 
 Nothing reviews the diff for you right now: after phase 3 the pull request is pushed, ready, and
-read by nobody but you (though phase 5 will act on what you say about it). The reviewer is written and wired — `prompts/code-review.md`, `reviewCode` in
-`phases.ts`, `codeReview` in `workflow.ts`, the Slack wording in `notify.ts` — but its single
-call site is commented out.
+read by nobody but you (though phase 5 will act on what you say about it). The reviewer is
+written and wired — `prompts/code-review.md`, `reviewCode` and `codeReview` in the Engine, the
+Slack wording in its notifier — and it runs the moment this golem asks for it.
 
-That is deliberate for the first runs. What those are for is watching plan → approve →
+That it is off is deliberate for the first runs. What those are for is watching plan → approve →
 implement work end to end, and a reviewer posting its own comment in the middle of that is one
 more thing to read while you are still deciding whether the part you care about worked. It also
 doubles the container time per issue before anyone has seen the first pull request.
 
-**To turn it on, uncomment two lines:**
+**To turn it on, edit one line** in `factory.config.mjs`:
 
-| | |
-|---|---|
-| `workflow.ts` | `await codeReview(shipped, decision.comment);` in `implement`, under the `phase 4, switched off for now` banner |
-| `notify.ts` | in `announceAttempt`, prefix the `revise` line with the sentence commented above it |
+```js
+phases: { codeReview: true, walkthrough: false },
+```
 
-Both are commented in place with that instruction, so neither is findable only from here.
+That is the whole of it. The Slack thread's "ready for your review" message is composed from the
+same toggle, so it starts promising a review in the same edit — the two cannot drift apart, which
+is the point of there being one switch rather than two.
 
 **Phase 4**, once on, only happens after `shipped`, and ends in one of four ways, three of which
 are a comment on the pull request:
@@ -896,16 +898,16 @@ no path into phase 5**: its comments carry the `<!-- golem -->` marker, so `deci
 read them as a change request. Switching phase 4 on cannot turn phase 5 into an agent reviewing
 and then fixing itself — the line `docs/adr/0002-…` drew and `0006` keeps.
 
-### Phase 6 — the walkthrough — is switched off too
+### Phase 6 — the walkthrough — is optional too, and also off
 
 After phase 3 pushes, one more container logs into staging, drives a browser to the pages the
 diff touches, saves a PNG of each, and the host puts them in the **pull request description**.
 
-**It is switched off**, like phase 4 and behind it in the queue. What comes first is verifying
-that a simplified flow works end to end through Jira on the new infrastructure, and a third
-container per issue — one that boots the application, logs into staging and drives a browser — is
-the largest new moving part here. Adding it to the run you are still trying to trust makes a
-failure in either harder to read.
+**It is off**, like phase 4 and behind it in the queue. What comes first is verifying that a
+simplified flow works end to end through Jira on the new infrastructure, and a third container
+per issue — one that boots the application, logs into staging and drives a browser — is the
+largest new moving part here. Adding it to the run you are still trying to trust makes a failure
+in either harder to read.
 
 It is structurally a twin of phase 4: a fresh session, after the push, read-only, best-effort, no
 return value, unable to hold the branch back. Where it differs is that **it does not have to be a
@@ -920,22 +922,25 @@ directory and counts the bytes — the images are found on disk. What the agent 
 becomes a caption: a shot it claimed and did not save never appears, and a shot it saved and did
 not caption appears under its own filename.
 
-**To turn it on, uncomment two lines — and write the third thing:**
+**To turn it on, edit one line — and then write the thing the line cannot give you:**
+
+```js
+phases: { codeReview: false, walkthrough: true },
+```
 
 | | |
 |---|---|
-| `workflow.ts` | `await walkthrough(shipped);` in `implement`, under the `phase 6, switched off for now` banner |
-| `notify.ts` | in `announceAttempt`, prefix the `revise` line with the phase 6 sentence commented above it |
+| `factory.config.mjs` | `phases.walkthrough: true` — this reaches the phase, and the Slack message starts promising screenshots |
 | `prompts/walkthrough.md` | Step 2, below — without it the phase runs and photographs nothing |
 
-The first two are commented in place with that instruction, so neither is findable only from here.
+The toggle is the Engine's half and it is finished. The prompt is this repository's half and it
+is not, so switching the phase on by itself buys a container per issue and no pictures.
 
 **⚠ Step 2 of `prompts/walkthrough.md` is an unwritten placeholder.** Everything around it is
 built and working — chromium in the image, the mount, the staging credentials, the host-side
 pickup, the branch, the body — but *how* an agent should start the app, log in and navigate is
 left to write. Until it is, the prompt tells the run to take no screenshots and report that it
-had no instructions, which lands in Slack as a skipped walkthrough — so turning the phase on
-before writing it buys a container per issue and no pictures. That is deliberate: the one
+had no instructions, which lands in Slack as a skipped walkthrough. That is deliberate: the one
 outcome that would do real damage is a fabricated screenshot, so the prompt forbids improvising
 one in as many words. `e2e/pages/auth/LoginPage.ts` already has `loginAsCustomer` /
 `loginAsFsp` / `loginAsFspAdmin`, and the credentials come from `E2E_TEST_*` via

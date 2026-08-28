@@ -101,4 +101,32 @@ export default defineConfig({
     review: "sonnet",
     walkthrough: "sonnet",
   },
+
+  /**
+   * The two optional phases. Both off, which is what this golem has always done —
+   * they used to be commented-out call sites in the Engine, and turning one on meant
+   * editing a dependency four repositories share.
+   *
+   * Declared rather than defaulted, like everything else here. A phase costs a
+   * container per issue and changes what a pull request carries, so the Engine makes
+   * every golem say which of them it wants rather than letting one be inherited from
+   * a version bump.
+   *
+   * `codeReview` is ready to switch on and costs one more container per issue — a
+   * fresh session that reads the pushed diff along two axes and comments. What is
+   * being established first is that plan → approve → implement works end to end
+   * through Jira on this infrastructure, and a second opinion landing in the middle
+   * of that is one more thing to read while you are still deciding whether the part
+   * you care about worked.
+   *
+   * `walkthrough` is behind it and needs something this repository has not written:
+   * `prompts/walkthrough.md` leaves its Step 2 — how to start the app, log in and
+   * drive a browser — as a placeholder. Switching it on today reaches the phase and
+   * gets an honest *No walkthrough* in Slack, which is the phase working correctly
+   * and not what anybody wants it for.
+   */
+  phases: {
+    codeReview: false,
+    walkthrough: false,
+  },
 });
