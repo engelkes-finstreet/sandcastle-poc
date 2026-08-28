@@ -67,8 +67,8 @@ importers:
         specifier: ^9.2.0
         version: 9.9.0
       '@finstreet/golem-engine':
-        specifier: 0.2.0
-        version: 0.2.0
+        specifier: 0.3.0
+        version: 0.3.0
       '@next/eslint-plugin-next':
         specifier: 16.1.6
         version: 16.1.6
@@ -407,8 +407,8 @@ packages:
       react: 19.0.0
       react-dom: 19.0.0
 
-  '@finstreet/golem-engine@0.2.0':
-    resolution: {integrity: sha512-89F+bffcf50Dcju/wA4dnDcN88fXEI3WHdcKvYttgBSdV9tfP9aUcIaUE/iVeCpfC3APoDehmPXcPIJoEqlphQ==, tarball: https://npm.pkg.github.com/download/@finstreet/golem-engine/0.2.0/dd4166f7369aec83e99f1c4a3b5eb0f63ce9362a}
+  '@finstreet/golem-engine@0.3.0':
+    resolution: {integrity: sha512-zqEbomPGonEud8s6zLXZfkcfuMEUpk5Pj0zy1PvFdL7FCS1G09Ue64KVNf8fi91K2Um1DMHRFK7ak/GWj1Y8Tg==, tarball: https://npm.pkg.github.com/download/@finstreet/golem-engine/0.3.0/ad750b73d11f7d5b8f5f85f4655f903b29e7363b}
     hasBin: true
 
   '@finstreet/golem-events@0.2.0':
@@ -2755,7 +2755,7 @@ snapshots:
       - babel-plugin-react-compiler
       - sass
 
-  '@finstreet/golem-engine@0.2.0':
+  '@finstreet/golem-engine@0.3.0':
     dependencies:
       '@ai-hero/sandcastle': 0.12.0
       '@finstreet/golem-events': 0.2.0
