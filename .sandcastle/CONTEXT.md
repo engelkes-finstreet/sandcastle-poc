@@ -125,7 +125,7 @@ The run that builds an approved plan, in a session that carries nothing from pha
 
 **Code review** (phase 4):
 The *agent* reviewer: a stranger to the code, reads the diff along both axes, posts a comment,
-fixes nothing. Optional, and off in this golem's `factory.config.mjs`.
+fixes nothing. Optional: a phase toggle in this golem's `factory.config.mjs` says whether it runs.
 _Avoid_: review, PR review — both read as a human's review, and this one is an agent's
 
 **Axis**:
@@ -146,7 +146,7 @@ The run that logs into staging, drives a browser to the pages a shipped diff tou
 photographs them. A sibling of the code review — fresh session, after the push, read-only,
 best-effort, unable to hold the branch back — and its opposite in what it hands over: pictures
 instead of a judgement, which is why it does not have to be a stranger to the code to be worth
-anything. Optional and off, alongside phase 4, and its prompt's browser-driving step is
+anything. Optional, toggled alongside phase 4, and its prompt's browser-driving step is
 still unwritten. See `0011-the-walkthrough-is-a-photograph-not-a-verdict.md`.
 _Avoid_: smoke test — that is the Engine's `smoke.ts`, the sandbox's own health check, and the two would be
 confused constantly; visual review, screenshot review — there is no review here, and a name that
