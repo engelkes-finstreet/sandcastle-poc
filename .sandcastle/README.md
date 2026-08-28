@@ -17,7 +17,7 @@ acts on what you say at both. It runs **one agent at a time but tracks as many i
 has state for**, so nothing waits on you. It never merges.
 
 ```
-pnpm golem:build-image   # once, and after any Dockerfile change
+pnpm golem:build-image   # once per Kit release; a no-op when this host already has the image
 pnpm golem               # start watching — Ctrl-C to stop
 pnpm golem:smoke         # health-check the sandbox itself
 ```
@@ -150,6 +150,14 @@ ask for.
 
 **1. Build the image.** `pnpm golem:build-image`. Takes a couple of minutes; the result is
 ~525MB and holds no application dependencies — those arrive per run from the mounted pnpm store.
+
+> The image is tagged for the Kit this golem vendored — its version *and* the commit that
+> version resolved to — and the user it is built for: e.g.
+> `golem:nextjs-fe-0.3.1-6ac91ad-uid501-gid20`, or `…-uid501-gid20-dockerfile<hash>` when the
+> Dockerfile has been edited here. So a second repository on the same Kit release on this machine
+> shares this image and the command finds nothing to do, and an edited Dockerfile builds its own
+> image without being asked to. `--force` rebuilds anyway, which is what to reach for when the
+> base image has moved under an unchanged Dockerfile.
 
 > The sandcastle CLI swallows each build step's stderr, so a failure can look like success.
 > When something breaks, get the real error from `docker build --progress=plain .sandcastle`.
