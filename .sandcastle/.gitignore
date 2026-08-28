@@ -2,6 +2,7 @@
 host.env
 logs/
 worktrees/
+rendered/
 state/
 watchtower/
 shots/

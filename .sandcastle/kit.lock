@@ -1,0 +1,18 @@
+{
+  "name": "nextjs-fe",
+  "version": "0.3.2",
+  "sha": "87fc43b7d46e1fc855edb6cba95e6b47fd608e63",
+  "engine": "^0.3.0",
+  "files": {
+    ".env.example": "sha256:27e1f8538bf94adb2a5e7f95c40b9930d74c0bd7b5f6b3dc236ff8b6faf1dca3",
+    "CONTEXT.md": "sha256:7503efcf9a0899b4005b39924cebd183f6086f11f611ab19f4aba725c7282b22",
+    "Dockerfile": "sha256:6a7bf9ffe965c244b30c6697eb72adb2eac9a0b2359393744ebe239599695555",
+    "prompts/code-review.md": "sha256:2fdd4d1c69fd58e280b52219bb57862e6ba18034bc69f46877552d9cc9a94af2",
+    "prompts/follow-up.md": "sha256:ed0f9677e35c5362d728cd9566f98b50b6b3cb67d040c9799a0d4f675d57d922",
+    "prompts/implement-plan.md": "sha256:2dae071724bc52cf50e3aa805eef55cb8d12fd48806d72fcf4a4a3ad0d4853ad",
+    "prompts/plan-issue.md": "sha256:5d569300cb572f08f6c29a1f00c94cdfb4c580fc68dce8b3ca69798e6f7c8027",
+    "prompts/smoke-test.md": "sha256:a79809dcb1a3b658ab044efc22a6cf27d3b9d7a7c9ba2df31becac65046e1cfa",
+    "prompts/walkthrough.md": "sha256:64965f9e3f3ff35b654b6be766775540c9e14681c845e75fb1c880a3c035da7d"
+  },
+  "ours": []
+}

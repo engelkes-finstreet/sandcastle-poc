@@ -1,6 +1,6 @@
 # Plan issue {{ISSUE_REF}}: {{ISSUE_TITLE}}
 
-You are an autonomous agent running inside a Sandcastle sandbox against **fs-fe-boilerplate**
+You are an autonomous agent running inside a sandboxed container against **fs-fe-boilerplate**
 — a single-package Next.js 16 app (App Router, Panda CSS, next-intl, next-auth). No monorepo,
 no `apps/`, no `packages/`, no turbo, no database.
 
@@ -75,8 +75,8 @@ Four sections, in this order, and no others:
 2. **Task plan** — the kickoff output in its own format: numbered tasks, each with the skill it
    uses (or `manual`), one line of detail, and what it depends on. This is the body of the plan
    and the only section allowed to be long.
-3. **Verification** — one or two lines. The gate is `pnpm exec tsc --noEmit`, `pnpm lint` and
-   `pnpm build`. Name anything you cannot check in this sandbox: the Playwright suite in `e2e/`
+3. **Verification** — one or two lines. The gate is {{gate_commands}}.
+   Name anything you cannot check in this sandbox: the Playwright suite in `e2e/`
    needs a login the implementation container is not given, and anything behind a login or a real API is out of
    reach here.
 4. **Open questions** — only decisions that are genuinely a human's to make: which of two

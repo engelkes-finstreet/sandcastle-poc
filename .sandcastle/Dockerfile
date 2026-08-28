@@ -31,7 +31,7 @@ RUN npm install -g pnpm@${PNPM_VERSION}
 # Chromium, for the walkthrough phase: an agent that logs into staging, drives a
 # real browser to the pages a pull request touches, and photographs them. Every
 # other phase is text-only and none of them pay for this at runtime — the layer is
-# built once, and only `walkPages` in src/phases.mts asks for the browser.
+# built once, and only `walkPages` in the Engine's `phases.ts` asks for the browser.
 #
 # Keep PLAYWRIGHT_VERSION in sync with @playwright/test in package.json, for the
 # same reason PNPM_VERSION is pinned above and with a nastier failure mode: a
@@ -69,17 +69,26 @@ ENV PNPM_HOME="/home/agent/.local/share/pnpm"
 ENV PATH="/home/agent/.local/bin:$PNPM_HOME:$PATH"
 
 # The container is recreated per run, so `pnpm install` would start from a cold
-# store every time. main.mts bind-mounts a persistent Linux store at the path
-# below — keep the two in sync:
-#   /home/agent/pnpm-store  ←  ~/.cache/sandcastle-pnpm-store
-# Not the host's own store (~/Library/pnpm/store): that one is darwin-arm64 and
-# is your local dev state.
+# store every time. The Engine's `sandbox.ts` bind-mounts a persistent Linux store at
+# the path below — keep the two in sync:
+#   /home/agent/pnpm-store  ←  ~/.cache/golem-pnpm-store
 #
-# package-import-method=copy is load-bearing, not a preference. A bind-mounted
-# store is a different device from the bind-mounted worktree, so pnpm's default
-# (hardlink) is impossible — and rather than fail, pnpm silently abandons the
-# configured store and builds a fresh one at <project>/.pnpm-store, downloading
-# everything again. Telling it to copy makes it honour the mount.
+# A store of the sandbox's own, rather than the host's (~/Library/pnpm/store on a Mac,
+# ~/.local/share/pnpm/store on the Linux host). On a Mac the two could not be shared
+# anyway — the host's is full of darwin-arm64 packages and a Linux container needs
+# different binaries for esbuild/sharp/swc — but that is not the reason it is
+# separate, because a golem also runs on a Linux host, where the architecture matches
+# and sharing would work. The reason holds on both: this store is written by
+# containers, and the store your own development depends on is not one to hand them.
+#
+# package-import-method=copy is load-bearing on either host, not a preference. The
+# store arrives as a bind mount of its own, and a bind mount is a different device
+# from the worktree's — which is a property of the mount rather than of macOS, so it
+# is as true on the Linux host as on a laptop. pnpm's default is to hardlink out of
+# the store into node_modules, hardlinks cannot cross a device boundary, and rather
+# than fail pnpm silently abandons the configured store and builds a fresh one at
+# <project>/.pnpm-store, downloading everything again. Telling it to copy makes it
+# honour the mount.
 ENV npm_config_store_dir="/home/agent/pnpm-store"
 ENV npm_config_package_import_method="copy"
 

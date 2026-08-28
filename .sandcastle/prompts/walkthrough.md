@@ -1,9 +1,9 @@
 # Photograph the change made for issue {{ISSUE_REF}}: {{ISSUE_TITLE}}
 
 Another agent planned this work, a human approved the plan, and a third run implemented it and
-pushed it. The gate it passed — `tsc --noEmit`, `pnpm lint`, `pnpm build` — proves the code
-compiles, lints and builds. It proves nothing at all about what the pages look like, because
-nothing has ever loaded one.
+pushed it. The gate it passed — {{gate_commands}} — proves the code holds
+together. It proves nothing at all about what the pages look like, because nothing has ever
+loaded one.
 
 **Your whole job is to load them and take pictures.** Log into the running application, walk to
 the pages this change touched, and save a screenshot of each. That is the deliverable: image
@@ -135,7 +135,7 @@ Then, for each file you saved, one `<shot>` line — see **Done**.
 - **Fix nothing.** You will probably find something broken — that is a large part of why this
   phase exists. Photograph it, caption it plainly, and leave it. A fix from here would land on a
   pull request a human has already been told is ready.
-- **Do not run the gate.** `tsc --noEmit`, `pnpm lint` and `pnpm build` were green before this run
+- **Do not run the gate.** {{gate_commands}} were green before this run
   started. You need a running app, not a re-verified one.
 - **Do not talk to GitHub or the tracker.** This container has no credential for either, by
   design. The host puts your screenshots on the pull request.

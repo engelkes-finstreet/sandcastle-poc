@@ -1,9 +1,19 @@
-# The Sandcastle Factory
+# The Golem
 
-The agent factory in `.sandcastle/`: a long-running host process that turns queued issues into
+This repository's agent factory: a long-running host process that turns queued issues into
 pull requests by running Claude Code in disposable containers, with a human deciding at two
-points. This is not the product — the Next.js application the factory operates on has its own
-vocabulary, and none of it belongs here.
+points. Its files live in `.sandcastle/`. This is not the product — the Next.js application
+the Golem operates on has its own vocabulary, and none of it belongs here.
+
+The `*.ts` files and the numbered ADRs named below are the **Engine's**
+(`@finstreet/golem-engine`, published from
+[`watchtower/packages/golem-engine`](https://github.com/finstreet/watchtower/tree/main/packages/golem-engine)),
+not this repository's. What is in this repository is the prompts, the Dockerfile and this
+Golem's own configuration.
+
+The ADRs are cited below by bare filename. They are not in this repository — read them in the
+installed Engine's `docs/adr/`, or in `packages/golem-engine/docs/adr/` in the Watchtower
+monorepo.
 
 ## Language
 
@@ -11,15 +21,16 @@ vocabulary, and none of it belongs here.
 
 **Issue**:
 A unit of work queued in the tracker, identified by an opaque string key. The only way work
-enters the factory. On a GitHub-tracked project it is a GitHub issue wearing the `Sandcastle`
+enters the factory. On a GitHub-tracked project it is a GitHub issue wearing the `Golem`
 label and its key is the issue number as a string.
 _Avoid_: ticket, task, story
 
 **Tracker**:
 Where work comes from, and where the watcher mirrors its state back to: the queue, an issue's
 text, the six lifecycle moments, the release comment, and both renderings of an issue's
-identity. A port — `src/tracker.mts`, chosen by `SANDCASTLE_TRACKER` — with two adapters:
-GitHub, and Jira for ESCB. See `0008-the-tracker-is-a-port-the-forge-is-github.md`.
+identity. A port in the Engine — `tracker.ts`, chosen by `GOLEM_TRACKER` — with two adapters,
+GitHub and Jira. Which one a golem uses is Profile, not stack. See
+`0008-the-tracker-is-a-port-the-forge-is-github.md`.
 _Avoid_: using it to mean GitHub specifically — the point of the word is that it may not be
 
 **Moment**:
@@ -37,11 +48,11 @@ _Avoid_: workflow config — the workflow is Jira's, and the map only names move
 
 **Flow**:
 One issue type's workflow, as the transition map sees it: the moments named under `"Sub-task"`, or
-under `"*"` for every type not named. A Jira workflow scheme binds a workflow per issue type, so
-ESCB has two — they use the same words for the two buttons the map fills in today, so the committed
-file is the flat single-flow shape, and they diverge after In CodeReview, which is where a flow per
-type will be needed. Which flow a moment uses is decided by the type of the issue it lands on,
-which for a scoped story is the subtask's, not the story's.
+under `"*"` for every type not named. A Jira workflow scheme binds a workflow per issue type, so a
+project may have more than one. Where they use the same words for the buttons the map fills in, the
+committed file can stay the flat single-flow shape; a flow per type is needed only once they
+diverge. Which flow a moment uses is decided by the type of the issue it lands on, which for a
+scoped story is the subtask's, not the story's.
 _Avoid_: workflow (Jira's word for the whole graph, of which a flow is only the moments we name),
 map per type (there is one map file; a flow is a section of it)
 
@@ -85,14 +96,25 @@ say about it.
 How an attempt ended — shipped, blocked, no-changes, or no-signal. Exactly one per attempt.
 
 **Gate**:
-`tsc --noEmit`, `pnpm lint` and `pnpm build`, green inside the sandbox. This repo has no test
-suite, so the gate is the whole of the automated check: it proves the code compiles, never that
-it works.
+The commands an agent must run green before it commits, in order, and what each has to produce.
+Declared once per golem, in `.sandcastle/factory.config.mjs`, and rendered from there into every
+prompt that names it and into the pull-request comment that claims it passed — so the commands an
+agent is told to run and the commands a pull request claims were green cannot disagree. What the
+gate proves is that the code holds together; it never proves that it works, because nothing in the
+sandbox has used it.
 
 ### The phases
 
 **Phase**:
 One numbered stage of an issue's life. Either an agent run or a human's decision, never both.
+
+**Phase toggle**:
+An entry in `factory.config.mjs`'s `phases` block, switching phase 4 or phase 6 on for this
+repository. Four phases always run; those two are the ones a golem opts into, and both are
+declared — the Engine refuses to start on a config that is silent about either. What the Slack
+thread promises is built from the same toggles, so a phase cannot be announced without running.
+_Avoid_: feature flag — a flag is a thing you flip while you roll something out, and these are a
+standing statement about what this repository's pull requests carry
 
 **Plan run** (phase 1):
 The read-only run that produces a plan and writes no code.
@@ -103,7 +125,7 @@ The run that builds an approved plan, in a session that carries nothing from pha
 
 **Code review** (phase 4):
 The *agent* reviewer: a stranger to the code, reads the diff along both axes, posts a comment,
-fixes nothing. Currently switched off.
+fixes nothing. Optional: a phase toggle in this golem's `factory.config.mjs` says whether it runs.
 _Avoid_: review, PR review — both read as a human's review, and this one is an agent's
 
 **Axis**:
@@ -124,9 +146,9 @@ The run that logs into staging, drives a browser to the pages a shipped diff tou
 photographs them. A sibling of the code review — fresh session, after the push, read-only,
 best-effort, unable to hold the branch back — and its opposite in what it hands over: pictures
 instead of a judgement, which is why it does not have to be a stranger to the code to be worth
-anything. Currently switched off, alongside phase 4, and its prompt's browser-driving step is
+anything. Optional, toggled alongside phase 4, and its prompt's browser-driving step is
 still unwritten. See `0011-the-walkthrough-is-a-photograph-not-a-verdict.md`.
-_Avoid_: smoke test — that is `smoke.mts`, the sandbox's own health check, and the two would be
+_Avoid_: smoke test — that is the Engine's `smoke.ts`, the sandbox's own health check, and the two would be
 confused constantly; visual review, screenshot review — there is no review here, and a name that
 implies one invites somebody to merge on it
 
@@ -143,6 +165,55 @@ about what is in the picture. Optional by construction, and quoted rather than t
 picture is the record and this is commentary on it.
 
 ### The watcher and its memory
+
+**Golem**:
+One deployment of the factory: a checkout of one repository with its own `.sandcastle/`, its own
+credentials, its own Slack channel and its own board. The unit a repository is served by, and the
+thing there is more than one of — three eco.scale frontends are three golems, and the frontend and
+backend repositories sharing one Jira story are two. See
+`0010-a-golem-takes-its-own-slice-of-a-story.md`, which is about what one golem may claim.
+_Avoid_: instance, deployment on its own — neither says that the repository is the boundary; bot —
+true of every Slack post already, so it distinguishes nothing
+
+**Engine**:
+The Kit-agnostic half of the factory, shipped as `@finstreet/golem-engine` and pinned per
+golem: the watcher, the six phases, the tracker port, the forge, the state files, and every rule
+about the flow. A dependency rather than a starting point — the flow through the tickets is the
+same in every repository, so no golem edits it and none may. See
+`0012-the-engine-ships-the-kit-is-vendored.md`.
+_Avoid_: core, framework — both invite the reading that a repository extends it; watcher — that is
+the process the Engine runs, one part of it rather than the whole
+
+**Kit**:
+What makes a golem competent in one *kind* of repository: the six prompts, the Dockerfile, the
+plugin allowlist, the gate, and the glossary that goes with them. Keyed by stack rather than by
+product — one `nextjs-fe` serves all three eco.scale frontends — and **vendored** into
+`.sandcastle/` rather than installed, so a prompt is read, argued about and edited where the code
+it describes lives. `kit.lock` records which version was vendored and `golem sync` three-way
+merges a newer one, which is what makes an edited prompt a legitimate state rather than a conflict
+somebody re-resolves forever.
+_Avoid_: template, preset — both suggest a one-time copy that never hears from its source again,
+which is the failure `kit.lock` exists to prevent; profile
+
+**Sandcastle**:
+`@ai-hero/sandcastle`, Matt Pocock's library — it is what actually runs Claude Code inside a
+container, and it is a dependency of the Engine rather than anything this repository calls.
+The word appears here for two reasons only: the dependency, and the `.sandcastle/` directory,
+whose name the library hardcodes when it reads `.sandcastle/.env`. Everything else in that
+directory is the Golem's and could have lived anywhere; it is one directory rather than two
+because two would be worse.
+_Avoid_: using it for anything we built — the factory is a **Golem**, its shipped half is the
+**Engine**, and the dashboard watching every Golem is **Watchtower**. A label, a branch, an
+env var or a script with "sandcastle" in it is a bug
+
+**Profile**:
+The facts true of one golem and no other: which board, which channel, which subtasks are its own,
+which keys the sandbox may see. `host.env`, `.env`, `jira-transitions.json`, `jira-subtasks.json`,
+and the pinned versions in `kit.lock` — which is to say, the half that already existed before the
+other two had names. The test that separates it from a Kit is whether a second repository on the
+same stack would want the same value: the gate would, the Jira project key would not.
+_Avoid_: config, environment — both are equally true of the Kit's `factory.config.mjs`, and
+telling the two apart is the whole point of the word
 
 **Watcher**:
 The host process that drives everything. One agent run at a time, many issues tracked at once.

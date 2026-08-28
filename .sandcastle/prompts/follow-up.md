@@ -70,13 +70,11 @@ else is doing. They are not yours to do.
    exists — especially if the request is *because* the first attempt did not follow it.
 3. **`CLAUDE.md` at the repo root is binding** where it exists. Its rules about branching, pushing
    and opening pull requests do not apply to you — the host does that.
-4. **Verify.** This repo has no unit or integration test suite, so the gate is all three of:
-   - `pnpm exec tsc --noEmit` — must be clean;
-   - `pnpm lint` — no new errors. One pre-existing warning about an unused
-     `getFspFinancingCaseOverview` is expected; leave it alone;
-   - `pnpm build` — must reach Next's route table.
+4. **Verify.** The gate — every command, and what each has to produce:
 
-   All three must pass before you commit. Quote any failure you cannot legitimately fix rather than
+   {{gate}}
+
+   All of them must pass before you commit. Quote any failure you cannot legitimately fix rather than
    working around it. `e2e/` is out of scope: it needs a login this container is not given.
 5. **Commit** in the repo's conventional-commit style, referencing the issue in the body as
    `Refs {{ISSUE_REF}}`. Write the subject for someone reading the pull request's commit list
@@ -84,7 +82,7 @@ else is doing. They are not yours to do.
 
 ## `messages/de.po` will change under you
 
-Running the gate is not read-only: `pnpm build` makes next-intl extract messages into the tracked
+Running the gate is not read-only: the build step makes next-intl extract messages into the tracked
 `messages/de.po`, and it picks up keys from across the codebase that were never committed — not
 just yours. So after the gate:
 
@@ -128,7 +126,7 @@ No preamble, no restating the request.
 
 ## Done
 
-When the change is made, all three gate commands pass, everything is committed, and the `<testing>`
+When the change is made, every gate command passes, everything is committed, and the `<testing>`
 block is written:
 
 <promise>COMPLETE</promise>

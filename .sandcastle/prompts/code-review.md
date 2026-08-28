@@ -296,8 +296,8 @@ some people will read.
   the host has already pushed.
 - **Do not comment on the pull request or the issue — you could not anyway.** This container has
   no tracker credential, so `gh` cannot reach GitHub. The host posts your review for you.
-- **Do not run the gate** — `tsc --noEmit`, `pnpm lint` and `pnpm build` were green before this
-  run started. Do not install anything, do not start a dev server.
+- **Do not run the gate** — {{gate_commands}} were green before this run
+  started. Do not install anything, do not start a dev server.
 - Do not print the value of any token or secret.
 
 ## Done

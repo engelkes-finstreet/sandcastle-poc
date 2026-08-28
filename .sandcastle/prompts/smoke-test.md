@@ -1,6 +1,6 @@
-# Sandcastle smoke test
+# Golem smoke test
 
-You are running inside a Sandcastle sandbox against **fs-fe-boilerplate** — a single-package
+You are running inside a sandboxed container against **fs-fe-boilerplate** — a single-package
 Next.js 16 app (App Router, Panda CSS, next-intl, next-auth), not a monorepo. There is no
 `apps/`, no `packages/`, no turbo and no database.
 
@@ -54,7 +54,7 @@ going instead of trying to fix it.
    read it back, confirm the contents, then delete it. Confirm `git status --porcelain` no
    longer mentions it.
 5. **Git works.** Report the current branch, `git config user.name` / `user.email` as
-   configured in the sandbox, and confirm the branch is a Sandcastle working branch rather
+   configured in the sandbox, and confirm the branch is a Golem working branch rather
    than `main`.
 6. **Install is complete and authenticated.** `pnpm install` already ran before you started,
    against a pnpm store mounted from the host. Confirm all four:
@@ -71,12 +71,11 @@ going instead of trying to fix it.
    `*linux*` packages and no `*darwin*` ones, and `pnpm exec next --version`,
    `pnpm exec panda --version` and `pnpm exec tsc --version` should all print a version
    rather than fail with an exec-format error. Report the versions.
-8. **The verification gate runs.** This repo has no unit or integration test suite, so the
-   gate an agent has to pass is typecheck, lint and build. Run all three and report the
-   outcome and rough duration of each:
-   - `pnpm exec tsc --noEmit` — expected clean;
-   - `pnpm lint` — expected 0 errors; warnings are fine, say how many;
-   - `pnpm build` — expected to reach Next's route table.
+8. **The verification gate runs.** This is what an agent has to pass before it commits, and
+   it is declared in `.sandcastle/factory.config.mjs` rather than here. Run every command and
+   report the outcome, the rough duration, and whether it produced what is expected of it:
+
+   {{gate}}
 
    Quote any error verbatim. That is the most valuable thing this whole smoke test can tell
    us. The Playwright suite in `e2e/` is deliberately **out of scope**: the image carries
