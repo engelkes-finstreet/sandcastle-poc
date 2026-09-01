@@ -61,9 +61,13 @@ export default defineConfig({
    *   under `.sandcastle/prompts` loads one, and `code-review.md` carries its own
    *   two-axis structure and smell baseline inline precisely so that a run does not
    *   depend on it.
-   * - `playwright`, which the walkthrough phase asks for by itself. One phase needs
-   *   a browser and four do not, and a plugin every phase installs is a plugin every
-   *   phase can be broken by.
+   * - `playwright`, which is not a plugin here at all any more. It was one, and it
+   *   never took a screenshot: the plugin runs `npx @playwright/mcp@latest` with no
+   *   arguments, and every default behind those two lines — the chrome channel, a
+   *   headed browser, chromium's own sandbox — is wrong for a container. The Engine
+   *   now registers that MCP server itself, with the flags that make it work, for the
+   *   one phase that drives a browser. See `browserCommand` in the Engine's
+   *   sandbox.ts, and `golem walkthrough-smoke`, which is what found it.
    */
   plugins: ["finstreet-dev@finstreet-plugins", "finstreet-fe@finstreet-plugins"],
 
@@ -119,14 +123,22 @@ export default defineConfig({
    * of that is one more thing to read while you are still deciding whether the part
    * you care about worked.
    *
-   * `walkthrough` is behind it and needs something this repository has not written:
-   * `prompts/walkthrough.md` leaves its Step 2 — how to start the app, log in and
-   * drive a browser — as a placeholder. Switching it on today reaches the phase and
-   * gets an honest *No walkthrough* in Slack, which is the phase working correctly
-   * and not what anybody wants it for.
+   * `walkthrough` is **on**, and was off for a reason that has since been removed:
+   * `prompts/walkthrough.md` left its Step 2 — how to start the app, log in and drive
+   * a browser — as a placeholder, so switching it on reached the phase and got an
+   * honest *No walkthrough* in Slack. Step 2 is written now, against what `golem
+   * walkthrough-smoke` established actually works in this container: derive the
+   * origin from the env files, pin it, wait on `/api/health`, and drive the
+   * playwright MCP server the Engine registers. `app-guide.md` is where the roles and
+   * the login live, because that is repository knowledge and not Kit knowledge.
+   *
+   * One caveat, and it is visible in every run until it is fixed: there is no
+   * `.env.e2e` in this checkout, so no account reaches the container and the
+   * walkthrough photographs public pages only. It says so rather than guessing —
+   * `env.e2e.example` is the file to copy when there are staging accounts to give it.
    */
   phases: {
     codeReview: false,
-    walkthrough: false,
+    walkthrough: true,
   },
 });

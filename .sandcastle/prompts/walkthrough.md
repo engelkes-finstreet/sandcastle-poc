@@ -27,9 +27,18 @@ container is thrown away when you exit, and `{{SHOTS_DIR}}` is the **only** thin
 it: it is a directory on the host, mounted in. Anything you save there is read back by the host
 the moment you finish; anything you write anywhere else is deleted with the container.
 
-The application's own environment — `.env` and `.env.e2e` — has been written into the worktree
-for you. It points at **staging**, with a throwaway test login. That is the one thing this phase
-is trusted with that no other phase is.
+The application's own environment — `.env`, `.env.local` and `.env.e2e` — has been written into
+the worktree
+for you. It points at **staging**, with throwaway test logins. That is the one thing this phase
+is trusted with that no other phase is. Read a credential with the shell when you need it and
+**never print one** — not in the log, not in a caption, not in the `<walkthrough>` block. Naming
+the role you logged in as is all any of this needs.
+
+The accounts this container was actually given, by variable name:
+
+!`grep -oE '^[[:space:]]*(export[[:space:]]+)?E2E_TEST_[A-Z0-9_]*' .env.e2e 2>/dev/null | tr -d ' ' | sort -u | grep . || echo 'NONE — no account was carried into this container, so you cannot log in'`
+
+{{app_guide}}
 
 ## What was asked for
 
@@ -67,34 +76,61 @@ reviewing this change would actually want to see.
 
 ## Step 2 — drive the browser
 
-<!-- ------------------------------------------------------------------------ -->
-<!-- TODO: the browser-driving instructions go here.                          -->
-<!--                                                                          -->
-<!-- This section is deliberately unwritten. Everything around it — the        -->
-<!-- image, the mount, the staging credentials, the host-side pickup, the      -->
-<!-- pull request body — is built and working; how an agent should actually    -->
-<!-- start the app, log in and navigate is the part left to write.            -->
-<!--                                                                          -->
-<!-- What the rest of this prompt already assumes it will say:                 -->
-<!--   * how to get the app running (`pnpm dev` on :3000, or the standalone    -->
-<!--     build via ./start-standalone.sh) and how to know when it is ready;    -->
-<!--   * how to log in — `e2e/pages/auth/LoginPage.ts` has loginAsCustomer /   -->
-<!--     loginAsFsp / loginAsFspAdmin already written, and the credentials     -->
-<!--     come from `E2E_TEST_*` via `e2e/utils/test-helpers.ts`;               -->
-<!--   * which role to log in as for which route;                             -->
-<!--   * how to take the screenshot itself (the playwright MCP server is       -->
-<!--     installed for this phase, and chromium is in the image at             -->
-<!--     $PLAYWRIGHT_BROWSERS_PATH).                                          -->
-<!--                                                                          -->
-<!-- Until it is written, follow the rule in Step 3 and report honestly that   -->
-<!-- you had no way to drive a browser. Do not improvise one.                  -->
-<!-- ------------------------------------------------------------------------ -->
+### Start the application
 
-**Until this section is filled in, you have no instructions for driving a browser.** Do not
-invent a procedure, do not guess at credentials, and above all do not save a placeholder image.
-Take no screenshots, skip to **Done**, and say in your `<walkthrough>` block that this prompt has
-no browser-driving instructions yet. An empty run that says why is exactly what the host expects
-here; a fabricated one is the only outcome that does real damage.
+```bash
+pnpm dev > /tmp/dev.log 2>&1 &
+```
+
+Next compiles the first route on a cold `.next`, which is slow, so wait for the server rather
+than assuming it. The health endpoint needs no session:
+
+```bash
+for i in $(seq 1 60); do
+  curl -sf http://localhost:3000/api/health && break
+  sleep 5
+done
+```
+
+A `{"message":"Server is running"}` means it is up. If sixty attempts pass without one, read
+`/tmp/dev.log` and stop. **A dev server that will not boot on this branch is one of the most
+valuable things this phase can report** — it is a failure the gate cannot catch, because
+`pnpm build` compiles the app without ever running it. Say what the log said, take no
+screenshots, and skip to **Done**.
+
+### Log in
+
+The playwright MCP server is registered for this run and already pointed at the chromium in this
+image — you do not need to install a browser or choose one. Everything here is a browser action
+against `http://localhost:3000`: this is not the Playwright test suite, and the page objects
+under `e2e/` are not available to you, though they are worth reading as documentation of a flow.
+
+The guide above says which role sees the pages you picked in Step 1, and how a login is done in
+this application. Follow it. Two things it cannot tell you, which apply every time:
+
+- **Clear cookies before each login.** The session survives between navigations, so logging in as
+  a second role without clearing leaves you on the first one's session — and you photograph the
+  wrong portal with nothing to warn you.
+- **Confirm where you landed before you photograph.** A successful login redirects. If you are
+  still on the login page, it failed, and photographing that page as if it were the feature is
+  the one thing this phase must never do.
+
+If a login fails, that is a **reportable result and not an obstacle to work around**. Say which
+role, say what the browser did instead, and carry on with what you can still reach. **One retry
+at most** — these are shared accounts and repeated failures lock them for everybody. Do not try
+another role's credentials, and do not go looking for a password in the repository.
+
+### Take the pictures
+
+Full-page screenshots of each page you chose in Step 1, in the order a human should read them.
+Nothing cropped, nothing annotated, no device emulation.
+
+A modal or a drawer usually needs the page behind it as well — closed, then open — because the
+question a reviewer is asking is what changed, and one picture of an open modal does not answer
+it.
+
+Wait for the page to settle before each shot. A screenshot taken mid-load is a picture of a
+spinner, it is indistinguishable from a broken page, and it will be read as one.
 
 ## Step 3 — save the screenshots
 
