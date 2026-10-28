@@ -52,3 +52,6 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# The Golem: credentials and state, never tracked (golem-engine 1.0.0 and later)
+/.sandcastle/
